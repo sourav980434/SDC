@@ -1,0 +1,99 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.topSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.titleGroup h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--primary);
+  margin: 0 0 4px 0;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--outline);
+  margin: 0;
+}
+
+.filterCard {
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+  display: flex;
+  gap: 12px;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  background-color: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: 8px 14px;
+}
+
+.searchInput {
+  border: none;
+  background: transparent;
+  width: 100%;
+  outline: none;
+  font-size: 14px;
+  color: var(--on-background);
+}
+
+.card {
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.th {
+  padding: 14px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+  background-color: var(--surface-container-low);
+  border-bottom: 1px solid var(--outline-variant);
+  letter-spacing: 0.5px;
+}
+
+.td {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--on-background);
+  border-bottom: 1px solid var(--outline-variant);
+  vertical-align: middle;
+}
+
+.actionBadge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}

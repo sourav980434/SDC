@@ -1,0 +1,290 @@
+.container {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 24px;
+  min-height: calc(100vh - 120px);
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-2xl);
+  padding: 24px;
+  box-shadow: 0 4px 12px var(--glass-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--outline-variant);
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.cardTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background-color: var(--secondary-container);
+  color: var(--on-secondary-container);
+}
+
+.badgeEdit {
+  background-color: #ffe0b2;
+  color: #e65100;
+}
+
+.badgeAdd {
+  background-color: #c8e6c9;
+  color: #1b5e20;
+}
+
+.searchBox {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.searchInput {
+  flex-grow: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-container-low);
+  font-size: 14px;
+  color: var(--on-background);
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: var(--secondary);
+}
+
+.listWrapper {
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  max-height: 500px;
+  overflow-y: auto;
+  background-color: var(--surface-container-lowest);
+}
+
+.listTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.listTh {
+  position: sticky;
+  top: 0;
+  background-color: var(--surface-container-high);
+  color: var(--outline);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11px;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--outline-variant);
+  z-index: 1;
+  white-space: nowrap;
+}
+
+.listRow {
+  cursor: pointer;
+  border-bottom: 1px solid var(--outline-variant);
+  transition: background-color 0.15s;
+}
+
+.listRow:hover {
+  background-color: var(--surface-container-low);
+}
+
+.listRowActive {
+  background-color: var(--secondary-container) !important;
+  color: var(--on-secondary-container);
+  font-weight: 600;
+}
+
+.listTd {
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formGroupFull {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
+
+.formInput {
+  padding: 8px 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-container-low);
+  font-size: 13.5px;
+  color: var(--on-background);
+  outline: none;
+}
+
+.formInput:focus {
+  border-color: var(--secondary);
+}
+
+.formInput:disabled {
+  background-color: var(--surface-container-high);
+  color: var(--outline);
+  cursor: not-allowed;
+}
+
+.formSelect {
+  padding: 8px 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-container-low);
+  font-size: 13.5px;
+  color: var(--on-background);
+  outline: none;
+}
+
+.formSelect:focus {
+  border-color: var(--secondary);
+}
+
+.formSelect:disabled {
+  background-color: var(--surface-container-high);
+  color: var(--outline);
+  cursor: not-allowed;
+}
+
+.formTextarea {
+  padding: 8px 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-container-low);
+  font-size: 13.5px;
+  color: var(--on-background);
+  outline: none;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.formTextarea:focus {
+  border-color: var(--secondary);
+}
+
+.formTextarea:disabled {
+  background-color: var(--surface-container-high);
+  color: var(--outline);
+  cursor: not-allowed;
+}
+
+.formSectionHeader {
+  grid-column: span 2;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--secondary);
+  border-bottom: 1px solid var(--outline-variant);
+  padding-bottom: 4px;
+  margin-top: 8px;
+}
+
+.actionBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  border-top: 1px solid var(--outline-variant);
+  padding-top: 16px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btnPrimary {
+  background-color: var(--primary);
+  color: #ffffff;
+}
+
+.btnPrimary:hover {
+  background-color: rgba(7, 10, 97, 0.9);
+}
+
+.btnSecondary {
+  background-color: var(--secondary);
+  color: #ffffff;
+}
+
+.btnSecondary:hover {
+  background-color: rgba(0, 99, 153, 0.9);
+}
+
+.btnOutline {
+  background-color: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--on-background);
+}
+
+.btnOutline:hover {
+  background-color: var(--surface-container-low);
+}
+
+.btnDanger {
+  background-color: var(--error);
+  color: #ffffff;
+}
+
+.btnDanger:hover {
+  background-color: rgba(186, 26, 26, 0.9);
+}
+
+.btn:disabled {
+  background-color: var(--surface-container-high);
+  color: var(--outline);
+  border: none;
+  cursor: not-allowed;
+}

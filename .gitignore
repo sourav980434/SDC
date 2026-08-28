@@ -1,0 +1,20 @@
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+*.log
+
+# PHP / Laravel
+backend/vendor/
+backend/.env
+backend/storage/*.key
+
+# Environment
+.env
+.env*.local
+
+# OS & Temp / Large Media
+.DS_Store
+Thumbs.db
+*.mp4

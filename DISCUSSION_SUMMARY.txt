@@ -1,0 +1,144 @@
+SANTOSHPUR DIAGNOSTIC CENTRE - AGENT HANDOVER & DISCUSSION SUMMARY
+==================================================================
+Date: July 10, 2026
+
+Dear AI Agent / Developer,
+Please read this file to understand the current state of the application, database mappings, and recent features added in the project.
+
+1. DB TABLES & REST APIS (LARAVEL BACKEND)
+------------------------------------------
+We have created 4 new Master CRUD modules connecting Next.js frontend to SQL Server database via Laravel backend (backend/routes/web.php).
+
+Table Details:
+A. MDepartment (Department Details)
+   - Code Prefix: "DP" + 6 digits (e.g., DP000001)
+   - Code Generator: getNextDepartmentCode()
+   - DB Schema:
+     * Code (nvarchar[8], Primary Key)
+     * Descr (nvarchar[50], Department Name)
+     * Remarks (nvarchar[100])
+     * AddUserCode, AddDate, ModUserCode, ModDate
+   - Endpoints:
+     * GET    /api/master/departments/list (Paginated, Searchable)
+     * GET    /api/master/departments (Dropdown helper - Code & Descr only)
+     * POST   /api/master/departments (Create)
+     * PUT    /api/master/departments/{code} (Update)
+     * DELETE /api/master/departments/{code} (Delete)
+
+B. MSubDepartment (Sub Department)
+   - Code Prefix: "SD" + 6 digits (e.g., SD000001)
+   - Code Generator: getNextSubDepartmentCode()
+   - DB Schema:
+     * Code (nvarchar[8], Primary Key)
+     * DeptCode (nvarchar[8], references MDepartment.Code)
+     * Descr (nvarchar[50], Sub Dept. Name)
+     * Remarks (nvarchar[100])
+     * AddUserCode, AddDate, ModUserCode, ModDate
+   - Endpoints:
+     * GET    /api/master/subdepartments/list (Paginated, Joined with MDepartment)
+     * GET    /api/master/subdepartments (Dropdown helper)
+     * POST   /api/master/subdepartments (Create)
+     * PUT    /api/master/subdepartments/{code} (Update)
+     * DELETE /api/master/subdepartments/{code} (Delete)
+
+C. MAgent (Marketing Executive)
+   - Code Prefix: "A" + 7 digits (e.g., A0000001)
+   - Code Generator: getNextAgentCode()
+   - DB Schema:
+     * Code (nvarchar[8], Primary Key)
+     * Descr (nvarchar[100], Name)
+     * Address (nvarchar[150])
+     * PinCode (nvarchar[8])
+     * District (nvarchar[50])
+     * PhoneNo (nvarchar[25])
+     * MobileNo (nvarchar[25])
+     * Status (smallint, 1=Active, 0=Inactive)
+     * Remarks (nvarchar[100])
+     * AddUserCode, AddDate, ModUserCode, ModDate
+   - Endpoints:
+     * GET    /api/master/agents (Paginated, Searchable)
+     * POST   /api/master/agents (Create)
+     * PUT    /api/master/agents/{code} (Update)
+     * DELETE /api/master/agents/{code} (Delete)
+
+D. MCollector (Collector Details)
+   - Code Prefix: "CL" + 6 digits (e.g., CL000001)
+   - Code Generator: getNextCollectorCode()
+   - DB Schema:
+     * Code (nvarchar[8], Primary Key)
+     * Descr (nvarchar[100], Name)
+     * Address1 (nvarchar[100])
+     * Address2 (nvarchar[100])
+     * PhoneNo (nvarchar[25])
+     * MobileNo (nvarchar[25])
+     * Status (smallint, 1=Active, 0=Inactive)
+     * Remarks (nvarchar[100])
+     * AddUserCode, AddDate, ModUserCode, ModDate
+   - Endpoints:
+     * GET    /api/master/collectors (Paginated, Searchable)
+     * POST   /api/master/collectors (Create)
+     * PUT    /api/master/collectors/{code} (Update)
+     * DELETE /api/master/collectors/{code} (Delete)
+
+2. FRONTEND NEW UI PAGES (NEXT.JS)
+----------------------------------
+We have created 4 new views in frontend/src/app/master:
+- Departments Master:   /master/departments       (frontend/src/app/master/departments/page.js)
+- Sub Departments:      /master/subdepartments    (frontend/src/app/master/subdepartments/page.js)
+- Marketing Executives: /master/marketing-executives (frontend/src/app/master/marketing-executives/page.js)
+- Collectors:           /master/collectors        (frontend/src/app/master/collectors/page.js)
+
+Each page shares "master.module.css" to maintain premium glassmorphic visual aesthetics, and supports full CRUD actions (Add, Mod, Del, Save, Cancel, Exit buttons) matching the old desktop application layouts.
+
+3. SIDEBAR MENU INTEGRATION
+---------------------------
+In frontend/src/components/Sidebar.js, the "Master" accordion group now includes the 4 new links. The accordion menu automatically remains open if the current URL route matches any route under `/master/`.
+
+4. SYSTEM GOTCHA: NEXT.JS COMPILER DEV CACHE CORRUPTION
+------------------------------------------------------
+IMPORTANT NOTE FOR THE NEXT AGENT:
+Running a production build check ("npm run build" or "npm.cmd run build") while a development server ("npm.cmd run dev") is actively running in the background corrupts the compiler build files in "frontend/.next". 
+This results in raw HTML loading on the browser with 404 styling errors (e.g., Layout.css, page.css not found).
+
+How to resolve:
+1. Stop all Node.js dev server processes.
+2. Force-delete the .next cache directory:
+   Remove-Item -Recurse -Force e:\SANTOSHPUR\frontend\.next
+3. Start a fresh development server instance:
+   npm.cmd run dev
+
+5. PATHOLOGY DIAGNOSTIC BOOKING UPDATES (JULY 14, 2026)
+------------------------------------------------------
+We implemented robust updates to the Booking / Advance module (frontend/src/app/booking/page.js):
+
+A. Split Payment Logic & Button Modes
+   - Enforced disabled states on payment selectors:
+     * New bookings (no saved payments): "Part Payment" button is locked/disabled. The "Payment" button mode is active.
+     * Saved bookings: "Payment" button is locked/disabled. The "Part Payment" button mode is active.
+     * Fully Paid bookings (Balance Due === 0): All payment modes, inputs, and payment methods are locked/disabled, rendering a green success notice: "✓ This booking is fully paid." Adding new tests automatically unlocks the fields.
+   - Removed all auto-fill functions on receivedAmount state. The Received Amount input field defaults to empty ("" displaying a "0.00" placeholder representing zero) and requires manual typing, preventing human data entry errors.
+
+B. Real-time Status Badges & Counter
+   - Placed a prominent Payment Status Badge in the Summary panel:
+     * FULL PAYMENT (Green) when expected paid matches/exceeds Grand Total.
+     * ADVANCE PAYMENT (Orange) when expected paid is greater than 0 but less than Grand Total.
+     * UNPAID (Red) when expected paid is 0.
+   - Refined the payment counter badge next to the "Advance/Paid" label in the Summary panel to incorporate the currently keyed received amount in the pending save count dynamically (e.g. `+ {paymentsList.length + 1}`).
+
+C. Traversal Keydown Navigation & Security Lock
+   - Restructured Enter key triggers on form fields:
+     * Pressing Enter on the "Search Tests" input when empty checks selection. If `selectedTests.length === 0`, it blocks navigation and alerts: "Please select at least one test."
+     * Hitting Enter when tests are added focus-jumps the cursor directly to the "Received Amount" input.
+     * Hitting Enter inside the "Received Amount" input box calls `e.preventDefault()` and does nothing. Focus remains securely in place to completely eliminate accidental voucher saves on consecutive Enter keypresses.
+   - Alt+S key combination is retained as the standard shortcut to trigger voucher saving.
+
+D. Dynamic Printed Receipts Sizing & Labels
+   - Receipts printed via history popup modal are dynamically labeled based on cumulative payment calculations:
+     * Title & status headers show "Full Payment Receipt" and outstanding balance as "Nil (Fully Paid)" if settled.
+     * If not settled, shows "Advance Payment Receipt" for the first entry (payment #1) and "Part Payment Receipt" for subsequent entries (#2, #3, etc.), clearly printing the remaining balance due.
+
+E. Enlarged Balance Due Sizing (2X)
+   - Resized and highlighted the "Balance Due" row inside the Booking Summary panel:
+     * Changed amount font size to 26px (2X standard) with extra-bold weight (800) and mono typeface.
+     * Wrapped the row in a status-colored background strip (red highlight when balance due exists, green highlight when settled) for high visibility.
+

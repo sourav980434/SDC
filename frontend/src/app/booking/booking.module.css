@@ -1,0 +1,641 @@
+.pageWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.topSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: 1px solid var(--outline-variant);
+  padding-bottom: 8px;
+}
+
+.breadcrumb {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--outline);
+  margin-bottom: 2px;
+}
+
+.breadcrumbActive {
+  color: var(--secondary);
+}
+
+.titleGroup h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.01em;
+}
+
+.voucherInfo {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--on-surface-variant);
+}
+
+.voucherNo {
+  color: var(--secondary);
+  font-weight: 700;
+}
+
+/* Two columns */
+.bookingGrid {
+  display: grid;
+  grid-template-columns: 8fr 4fr;
+  gap: 12px;
+}
+
+@media (max-width: 1024px) {
+  .bookingGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.formCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formCard {
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-2xl);
+  padding: 12px 16px;
+  box-shadow: 0 4px 12px var(--glass-shadow);
+}
+
+.formHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: var(--secondary);
+}
+
+.formHeader h3 {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.colSpan2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 768px) {
+  .colSpan2 {
+    grid-column: span 1;
+  }
+}
+
+.ageGroup {
+  display: flex;
+  gap: 6px;
+}
+
+.phoneInputWrapper {
+  display: flex;
+}
+
+.phonePrefix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  background-color: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-right: none;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  font-size: 13.5px;
+  color: var(--on-surface-variant);
+}
+
+.phoneInput {
+  flex-grow: 1;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+/* Test selection */
+.testSelectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.legacyLink {
+  color: var(--secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.legacyLink:hover {
+  text-decoration: underline;
+}
+
+.searchBoxWrapper {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--outline);
+}
+
+.searchFieldInput {
+  width: 100%;
+  padding: 7px 10px 7px 30px;
+  border: 1px solid var(--outline-variant);
+  background-color: var(--surface-container-low);
+  border-radius: var(--radius-lg);
+  font-size: 12.5px;
+  color: var(--on-background);
+  outline: none;
+  transition: all 0.2s;
+}
+
+.searchFieldInput:focus {
+  border-color: var(--secondary);
+  background-color: var(--surface-container-lowest);
+}
+
+.searchResultsDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.resultItem {
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--surface-container-low);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.resultItem:last-child {
+  border-bottom: none;
+}
+
+.resultItem:hover {
+  background-color: var(--surface-container-high);
+}
+
+.resultName {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.resultCode {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--outline);
+  margin-top: 2px;
+}
+
+.resultPrice {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--secondary);
+  white-space: nowrap;
+}
+
+.tableWrapper {
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  min-height: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  background-color: var(--surface-container-lowest);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.th {
+  padding: 6px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--outline);
+  background-color: var(--surface-container-high);
+  border-bottom: 1px solid var(--outline-variant);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.testCode {
+  font-family: var(--font-mono);
+  color: var(--secondary);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.testPrice {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.removeBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--error);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s;
+}
+
+.removeBtn:hover {
+  background-color: var(--error-container);
+}
+
+/* Billing Column */
+.billingCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.billingCard {
+  background-color: var(--surface-container-lowest);
+  border: 2px solid var(--secondary);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: 0 8px 24px var(--glass-shadow);
+}
+
+.billingHeader {
+  background-color: var(--secondary);
+  color: #ffffff;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.billingHeader h4 {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.billingBody {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.billRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--on-surface-variant);
+  font-size: 12.5px;
+}
+
+.billSubtotal {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.billDiscount {
+  font-family: var(--font-mono);
+  color: var(--error);
+}
+
+.billTotalDivider {
+  border-top: 1px dashed var(--outline-variant);
+  padding-top: 10px;
+}
+
+.grandTotalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.grandTotalLabel {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.grandTotalVal {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--secondary);
+  font-family: var(--font-mono);
+}
+
+.inWords {
+  font-size: 10px;
+  color: var(--outline);
+  font-style: italic;
+  text-align: right;
+  margin-top: 2px;
+}
+
+.paymentModeSection {
+  border-top: 1px solid var(--surface-container);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paymentButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.payModeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid var(--outline-variant);
+  background-color: var(--surface-container-low);
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.payModeBtnActive {
+  border-color: var(--secondary);
+  background-color: var(--secondary-container);
+  color: var(--on-secondary-container);
+}
+
+.receivedField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.receivedInputWrapper {
+  position: relative;
+}
+
+.receivedInputSign {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.receivedInputField {
+  width: 100%;
+  padding: 8px 12px 8px 24px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  font-size: 16px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+
+.receivedInputField:focus {
+  border-color: var(--secondary);
+}
+
+.payMethodGroup {
+  background-color: var(--surface-container);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.payMethodOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.payRadioLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.actionGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.savePrintRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.saveInvoiceBtn {
+  background-color: var(--primary);
+  color: #ffffff;
+  padding: 9px;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  font-size: 12.5px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(7, 10, 97, 0.2);
+  transition: all 0.2s;
+}
+
+.saveInvoiceBtn:active {
+  transform: scale(0.98);
+}
+
+.printInvoiceBtn {
+  background-color: var(--secondary);
+  color: #ffffff;
+  padding: 9px;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  font-size: 12.5px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 99, 153, 0.2);
+  transition: all 0.2s;
+}
+
+.printInvoiceBtn:active {
+  transform: scale(0.98);
+}
+
+.whatsappBtn {
+  background-color: transparent;
+  color: var(--secondary);
+  border: 2px solid var(--secondary);
+  padding: 7px 10px;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.whatsappBtn:hover {
+  background-color: rgba(0, 99, 153, 0.05);
+}
+
+/* Quick links cards */
+.quickLinksGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.quickLinkCard {
+  background-color: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quickLinkCard:hover {
+  background-color: var(--surface-container-lowest);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  transform: translateY(-2px);
+}
+
+.quickLinkCardSpan {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-top: 4px;
+}
+
+.btnShortcut {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-sm);
+  padding: 1px 4px;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  margin-left: 6px;
+  text-transform: uppercase;
+}
+
+.resultItemActive {
+  background-color: var(--secondary-container) !important;
+  color: var(--on-secondary-container) !important;
+}
+
+.bookingNoInput {
+  background-color: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  color: var(--secondary);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  width: 70px;
+  padding: 2px 4px;
+  text-align: center;
+  outline: none;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.bookingNoInput:focus {
+  border-color: var(--secondary);
+  background-color: var(--surface-container-lowest);
+  box-shadow: 0 0 0 2px var(--secondary-container);
+}
+
+

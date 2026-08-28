@@ -1,0 +1,147 @@
+.pageWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.topSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--outline-variant);
+  padding-bottom: 12px;
+}
+
+.titleGroup h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--outline);
+  margin-top: 2px;
+}
+
+.filterCard {
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  padding: 16px;
+  box-shadow: 0 4px 12px var(--glass-shadow);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.searchBox {
+  position: relative;
+  flex-grow: 1;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--outline);
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  outline: none;
+  background-color: var(--surface-container-low);
+  color: var(--on-background);
+}
+
+.searchInput:focus {
+  border-color: var(--secondary);
+  background-color: var(--surface-container-lowest);
+}
+
+.tableCard {
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 4px 12px var(--glass-shadow);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.th {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--outline);
+  background-color: var(--surface-container-high);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--outline-variant);
+  font-size: 13px;
+}
+
+.invBadge {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--secondary);
+}
+
+.bookingRefBadge {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--primary);
+  background-color: var(--surface-container);
+  padding: 2px 6px;
+  border-radius: var(--radius-md);
+}
+
+.paidBadge {
+  background-color: #dcfce7;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.dueBadge {
+  background-color: #fef3c7;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  background-color: var(--primary);
+  color: #ffffff;
+  transition: opacity 0.2s;
+}
+
+.actionBtn:hover {
+  opacity: 0.9;
+}
