@@ -259,8 +259,8 @@ export default function MarketingExecutiveMaster() {
                     }}
                   >
                     <td className={styles.listTd}>{a.Code}</td>
-                    <td className={styles.listTd} style={{ fontWeight: '600' }}>{a.Descr}</td>
-                    <td className={styles.listTd}>{a.Address || '-'}</td>
+                    <td className={styles.listTd} style={{ fontWeight: '600' }} title={a.Descr}>{a.Descr}</td>
+                    <td className={styles.listTd} title={a.Address || ''}>{a.Address || '-'}</td>
                   </tr>
                 );
               })}

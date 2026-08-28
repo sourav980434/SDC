@@ -256,8 +256,8 @@ export default function CollectorMaster() {
                     }}
                   >
                     <td className={styles.listTd}>{c.Code}</td>
-                    <td className={styles.listTd} style={{ fontWeight: '600' }}>{c.Descr}</td>
-                    <td className={styles.listTd}>{contact}</td>
+                    <td className={styles.listTd} style={{ fontWeight: '600' }} title={c.Descr}>{c.Descr}</td>
+                    <td className={styles.listTd} title={contact}>{contact}</td>
                   </tr>
                 );
               })}

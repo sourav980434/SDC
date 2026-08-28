@@ -296,8 +296,8 @@ export default function DoctorMaster() {
                     }}
                   >
                     <td className={styles.listTd}>{doc.Code}</td>
-                    <td className={styles.listTd}>{fullName}</td>
-                    <td className={styles.listTd}>{address || '-'}</td>
+                    <td className={styles.listTd} title={fullName}>{fullName}</td>
+                    <td className={styles.listTd} title={address || ''}>{address || '-'}</td>
                   </tr>
                 );
               })}

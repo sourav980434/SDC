@@ -83,7 +83,7 @@
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-lg);
   max-height: 500px;
-  overflow-y: auto;
+  overflow: auto;
   background-color: var(--surface-container-lowest);
 }
 
@@ -127,6 +127,9 @@
 .listTd {
   padding: 10px 12px;
   white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .formGrid {
