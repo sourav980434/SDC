@@ -27,8 +27,8 @@ if %errorlevel% neq 0 goto :NO_NODE
 if not exist "%ROOT_DIR%frontend\node_modules" goto :INSTALL_FRONTEND
 
 :START_SERVERS
-:: Dynamically detect local network IPv4 address
-set "LOCAL_IP=localhost"
+:: Dynamically detect IPv4 address
+set "LOCAL_IP=127.0.0.1"
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
     for /f "tokens=1" %%b in ("%%a") do set "LOCAL_IP=%%b"
 )
@@ -42,9 +42,8 @@ start "Santoshpur_Frontend_3000" /d "%ROOT_DIR%frontend" cmd /k "color 0A && ech
 echo.
 echo ======================================================================
 echo  [DONE] Application services launched!
-echo  Local Access:   http://localhost:3000
-echo  Network Access: http://%LOCAL_IP%:3000
-echo  Backend API:    http://%LOCAL_IP%:8000
+echo  Frontend URL: http://%LOCAL_IP%:3000
+echo  Backend API:  http://%LOCAL_IP%:8000
 echo ======================================================================
 echo.
 ping 127.0.0.1 -n 3 >nul
