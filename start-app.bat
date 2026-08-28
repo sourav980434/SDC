@@ -3,7 +3,7 @@ title Santoshpur Diagnostic Centre - App Launcher
 color 0A
 
 echo ======================================================================
-echo           SANTOSHPUR DIAGNOSTIC CENTRE & POLYCLINIC
+echo           SANTOSHPUR DIAGNOSTIC CENTRE ^& POLYCLINIC
 echo                      Starting Services...
 echo ======================================================================
 echo.

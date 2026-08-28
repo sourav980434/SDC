@@ -3,7 +3,7 @@ title Santoshpur Diagnostic Centre - Stop Services
 color 0C
 
 echo ======================================================================
-echo           SANTOSHPUR DIAGNOSTIC CENTRE & POLYCLINIC
+echo           SANTOSHPUR DIAGNOSTIC CENTRE ^& POLYCLINIC
 echo                      Stopping Services...
 echo ======================================================================
 echo.
