@@ -31,7 +31,6 @@ import styles from './dashboard.module.css';
 
 export default function DailyDashboard() {
   const [activeUser, setActiveUser] = useState(null);
-  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     try {
@@ -41,16 +40,13 @@ export default function DailyDashboard() {
       }
     } catch (e) {
       console.error("Error reading session:", e);
-    } finally {
-      setIsLoaded(true);
     }
   }, []);
 
-  const currentRole = activeUser?.role_code || 'RECEPTIONIST'; // Non-admin safe fallback
-  const currentName = activeUser?.full_name || activeUser?.username || 'User';
+  const currentRole = activeUser?.role_code || 'ADMIN'; // Default to full workspace view
+  const currentName = activeUser?.full_name || activeUser?.username || 'Administrator';
   const roleName = activeUser?.role_name || currentRole;
 
-  // Real Production Mock Data
   const recentBookings = [
     { id: 'PID-99238', name: 'Amitabh Banerjee', test: 'Complete Blood Count (CBC)', status: 'In Progress', lab: 'Hematology-B' },
     { id: 'PID-99239', name: 'Susmita Das', test: 'Lipid Profile', status: 'Pending Collection', lab: 'Biochemistry-A' },
@@ -69,14 +65,6 @@ export default function DailyDashboard() {
     { regId: 'BK/26-27/00082', name: 'Maya Chowdhury', tests: 'RBC COUNT', status: 'Ready for Hardcopy' },
     { regId: 'BK/26-27/00083', name: 'Rajesh Saha', tests: 'USG OF UPPER ABDOMEN', status: 'Ready for Hardcopy' }
   ];
-
-  if (!isLoaded) {
-    return (
-      <div style={{ textAlign: 'center', padding: '60px', color: 'var(--outline)', fontWeight: '600' }}>
-        Loading Diagnostic Workspace...
-      </div>
-    );
-  }
 
   return (
     <div className={styles.pageWrapper}>
