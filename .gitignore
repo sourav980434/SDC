@@ -6,7 +6,6 @@ frontend/build/
 *.log
 
 # PHP / Laravel
-backend/vendor/
 backend/.env
 backend/storage/*.key
 
