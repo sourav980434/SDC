@@ -8,6 +8,24 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/api', function () {
+    $dbStatus = 'DISCONNECTED';
+    try {
+        if (DB::connection()->getPdo()) {
+            $dbStatus = 'CONNECTED';
+        }
+    } catch (\Exception $e) {
+        $dbStatus = 'ERROR: ' . $e->getMessage();
+    }
+
+    return response()->json([
+        'status' => 'ONLINE',
+        'app' => 'Santoshpur Diagnostic Centre LIMS API',
+        'database' => $dbStatus,
+        'timestamp' => now()->toDateTimeString()
+    ]);
+});
+
 // Helper functions for auto-generating codes
 function getNextDoctorCode() {
     $maxCode = DB::table('MDoctor')->max('Code');
