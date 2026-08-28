@@ -23,8 +23,8 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000" ^| findstr "LISTENING
 )
 
 :: Close named CMD windows
-taskkill /FI "WINDOWTITLE eq Santoshpur_LIMS_Backend_8000*" /F >nul 2>&1
-taskkill /FI "WINDOWTITLE eq Santoshpur_LIMS_Frontend_3000*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq Santoshpur_Backend_8000*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq Santoshpur_Frontend_3000*" /F >nul 2>&1
 
 echo.
 echo ======================================================================
