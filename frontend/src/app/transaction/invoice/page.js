@@ -115,66 +115,88 @@ export default function InvoicePage() {
   };
 
   const handlePrintSelectedTaxInvoice = (targetInv = null) => {
-    const invData = targetInv || selectedInv;
-    if (!invData) return;
+    const rawInv = targetInv || selectedInv;
+    if (!rawInv) return;
+
+    const invKey = rawInv.invoiceNo || rawInv.invoice_no || rawInv.bookingNo || rawInv.booking_no;
+    if (!invKey) return;
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert('Please allow pop-ups to print the final tax invoice.');
       return;
     }
+    printWindow.document.write('<div style="font-family:sans-serif; padding:40px; text-align:center; color:#475569;"><h2>Loading Invoice Receipt...</h2><p>Please wait a moment while details are fetched.</p></div>');
 
-    const netAmt = parseFloat(invData.netAmount ?? invData.net_amount ?? 0);
-    const paidAmt = parseFloat(invData.paidAmount ?? invData.paid_amount ?? 0);
-    const dueAmt = parseFloat(invData.dueAmount ?? invData.due_amount ?? 0);
-    const latestPmt = invData.payments && invData.payments.length > 0 ? invData.payments[invData.payments.length - 1].amount : 0;
-    const initialAdv = Math.max(0, paidAmt - latestPmt);
+    fetch(`${API_BASE}/api/invoice/details?inv_no=${encodeURIComponent(invKey)}`)
+      .then(res => res.json())
+      .then(invData => {
+        if (invData.error) {
+          printWindow.document.open();
+          printWindow.document.write(`<h3 style="color:red; padding:20px;">Error loading receipt: ${invData.error}</h3>`);
+          printWindow.document.close();
+          return;
+        }
 
-    const safeInvoiceNo = invData.invoiceNo || invData.invoice_no || 'INV/26-27/01001';
-    const safeBookingNo = invData.bookingNo || invData.booking_no || '';
-    const safePatientName = invData.patientName || invData.patient_name || 'Guest';
-    const safePrefix = invData.prefix || 'Mr.';
-    const safeAge = invData.age || invData.age_year || '';
-    const safeSex = invData.sex || 'Male';
-    const safePhone = invData.phone || invData.mobile_no || '';
-    const safeAddress = invData.address || '';
-    const safeReferredBy = invData.referredBy || invData.doctorName || invData.doctor_name || 'Dr. SELF';
-    const safeInvoiceDate = invData.date_formatted || invData.invoiceDate || invData.invoice_date || new Date().toLocaleString('en-GB');
+        const netAmt = parseFloat(invData.netAmount ?? invData.net_amount ?? rawInv.net_amount ?? 0);
+        const paidAmt = parseFloat(invData.paidAmount ?? invData.paid_amount ?? rawInv.paid_amount ?? 0);
+        const dueAmt = parseFloat(invData.dueAmount ?? invData.due_amount ?? rawInv.due_amount ?? 0);
+        const latestPmt = invData.payments && invData.payments.length > 0 ? invData.payments[invData.payments.length - 1].amount : 0;
+        const initialAdv = Math.max(0, paidAmt - latestPmt);
 
-    const htmlContent = generateA5BillReceiptHTML({
-      invoiceNo: safeInvoiceNo,
-      invoiceDate: safeInvoiceDate,
-      bookingNo: safeBookingNo,
-      patientCode: invData.patientCode || invData.patient_code || '',
-      prefix: safePrefix,
-      patientName: safePatientName,
-      age: safeAge,
-      ageUnit: 'Yrs',
-      sex: safeSex,
-      patientType: invData.patientType || 'GENERAL',
-      phone: safePhone,
-      address: safeAddress,
-      referredBy: safeReferredBy,
-      selectedTests: (invData.items || []).map(item => ({
-        code: item.code || item.test_code || '',
-        name: item.name || item.testName || item.test_name || item.Descr || 'Diagnostic Test',
-        test_name: item.name || item.testName || item.test_name || item.Descr || 'Diagnostic Test',
-        price: parseFloat(item.price ?? item.amount ?? item.Rate ?? 0),
-        delivery_date: item.delivery_date || 'Same Day'
-      })),
-      totalAmount: netAmt,
-      discountAmount: parseFloat(invData.discountValue || invData.discount_value || 0),
-      netAmount: netAmt,
-      advanceReceived: initialAdv,
-      currentPayment: latestPmt,
-      totalPaid: paidAmt,
-      balanceDue: dueAmt,
-      paymentMethod: invData.paymentMethod || invData.payment_mode || 'Cash',
-      printedBy: 'Admin',
-    });
+        const safeInvoiceNo = invData.invoiceNo || invData.invoice_no || rawInv.invoice_no || 'INV/26-27/01001';
+        const safeBookingNo = invData.bookingNo || invData.booking_no || rawInv.booking_no || '';
+        const safePatientName = invData.patientName || invData.patient_name || rawInv.patient_name || 'Guest';
+        const safePrefix = invData.prefix || invData.bk_prefix || rawInv.prefix || rawInv.patient_prefix || 'Mr.';
+        const safeAge = invData.age || invData.bk_age_year || rawInv.age || rawInv.age_year || '';
+        const safeSex = invData.sex || invData.bk_sex || rawInv.sex || 'Male';
+        const safePhone = invData.phone || invData.bk_mobile_no || rawInv.phone || rawInv.mobile_no || '';
+        const safeAddress = invData.address || invData.bk_address || rawInv.address || '';
+        const safeReferredBy = invData.referredBy || invData.bk_doctor_name || rawInv.doctor_name || 'Dr. SELF';
+        const safeInvoiceDate = invData.date_formatted || invData.invoiceDate || invData.invoice_date || rawInv.invoice_date || new Date().toLocaleString('en-GB');
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+        const htmlContent = generateA5BillReceiptHTML({
+          invoiceNo: safeInvoiceNo,
+          invoiceDate: safeInvoiceDate,
+          bookingNo: safeBookingNo,
+          patientCode: invData.patientCode || invData.patient_code || rawInv.patient_code || '',
+          prefix: safePrefix,
+          patientName: safePatientName,
+          age: safeAge,
+          ageUnit: 'Yrs',
+          sex: safeSex,
+          patientType: invData.patientType || 'GENERAL',
+          phone: safePhone,
+          address: safeAddress,
+          referredBy: safeReferredBy,
+          selectedTests: (invData.items || []).map(item => ({
+            code: item.code || item.test_code || '',
+            name: item.name || item.testName || item.test_name || item.Descr || 'Diagnostic Test',
+            test_name: item.name || item.testName || item.test_name || item.Descr || 'Diagnostic Test',
+            price: parseFloat(item.price ?? item.amount ?? item.Rate ?? 0),
+            delivery_date: item.delivery_date || 'Same Day'
+          })),
+          totalAmount: netAmt,
+          discountAmount: parseFloat(invData.discountValue || invData.discount_value || 0),
+          netAmount: netAmt,
+          advanceReceived: initialAdv,
+          currentPayment: latestPmt,
+          totalPaid: paidAmt,
+          balanceDue: dueAmt,
+          paymentMethod: invData.paymentMethod || invData.payment_mode || 'Cash',
+          printedBy: 'Admin',
+        });
+
+        printWindow.document.open();
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+      })
+      .catch(err => {
+        console.error("Print fetch error:", err);
+        printWindow.document.open();
+        printWindow.document.write('<h3 style="color:red; padding:20px;">Failed to load invoice receipt data.</h3>');
+        printWindow.document.close();
+      });
   };
 
   if (perms.isLoaded && perms.can_view === false) {
