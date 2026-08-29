@@ -46,14 +46,14 @@
   font-weight: 700;
 }
 
-/* Two columns */
+/* Two columns - Scaled for 1920x1080 Full HD & Fluid Responsiveness */
 .bookingGrid {
   display: grid;
-  grid-template-columns: 8fr 4fr;
-  gap: 12px;
+  grid-template-columns: 8.2fr 3.8fr;
+  gap: 16px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
   .bookingGrid {
     grid-template-columns: 1fr;
   }
@@ -88,14 +88,8 @@
 
 .formGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-@media (max-width: 768px) {
-  .formGrid {
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
 }
 
 .colSpan2 {

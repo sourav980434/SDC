@@ -489,13 +489,16 @@
   opacity: 0.95;
 }
 
-/* Page Content Canvas */
+/* Page Content Canvas - Optimized for Full HD 1920x1080 & Fluid Responsiveness */
 .content {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 16px 24px;
   padding-bottom: 96px;
   position: relative;
+  max-width: 1920px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 /* Sticky Status Footer */

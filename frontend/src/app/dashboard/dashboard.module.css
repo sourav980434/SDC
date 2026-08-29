@@ -55,23 +55,11 @@
   opacity: 0.8;
 }
 
-/* Bento Grid */
+/* Bento Grid - Fluid Auto-Fit Columns for 1920x1080 Full HD & Laptops */
 .bentoGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-}
-
-@media (max-width: 1024px) {
-  .bentoGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .bentoGrid {
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
 }
 
 .bentoCard {
@@ -156,14 +144,14 @@
   border-radius: var(--radius-full);
 }
 
-/* Two Column Layout */
+/* Two Column Layout - Optimized for 1920x1080 Full HD & Laptops */
 .dashboardMainGrid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 2.2fr 1fr;
   gap: 24px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1180px) {
   .dashboardMainGrid {
     grid-template-columns: 1fr;
   }

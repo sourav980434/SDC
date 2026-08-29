@@ -1,8 +1,8 @@
 .container {
   display: grid;
-  grid-template-columns: 5fr 7fr;
+  grid-template-columns: minmax(340px, 5fr) 7fr;
   gap: 24px;
-  min-height: calc(100vh - 120px);
+  min-height: calc(100vh - 140px);
   align-items: start;
 }
 
@@ -82,7 +82,8 @@
 .listWrapper {
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-lg);
-  max-height: 500px;
+  max-height: calc(100vh - 240px);
+  min-height: 420px;
   overflow: auto;
   background-color: var(--surface-container-lowest);
 }
