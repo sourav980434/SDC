@@ -7,6 +7,8 @@ import PermissionButton from '@/components/PermissionButton';
 import { useActionPermission } from '@/hooks/useActionPermission';
 
 import API_BASE from '@/lib/apiConfig';
+import { generateA5BillReceiptHTML } from '@/lib/billReceiptTemplate';
+
 export default function InvoicePage() {
   const perms = useActionPermission('invoice');
   const [invoices, setInvoices] = useState([]);
@@ -48,25 +50,79 @@ export default function InvoicePage() {
   };
 
   const handleSettleBalanceInInvoice = (bookingNo, dueAmt) => {
-    if (!confirm(`Collect remaining balance ₹ ${dueAmt.toFixed(2)} and update invoice to FULLY PAID?`)) return;
+    const dueVal = parseFloat(dueAmt || 0);
+    if (!confirm(`Collect remaining balance ₹ ${dueVal.toFixed(2)} and update invoice to FULLY PAID?`)) return;
     fetch(`${API_BASE}/api/invoice/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         bookingNo: bookingNo,
-        collectAmount: dueAmt,
+        collectAmount: dueVal,
         paymentMode: 'Cash'
       })
     })
       .then(res => res.json())
       .then(data => {
-        alert(`Balance ₹ ${dueAmt.toFixed(2)} collected successfully! Invoice is now FULLY PAID.`);
+        alert(`Balance ₹ ${dueVal.toFixed(2)} collected successfully! Invoice is now FULLY PAID.`);
         fetchInvoices(search);
-        fetch(`${API_BASE}/api/invoice/by-no/${encodeURIComponent(selectedInv.invoiceNo)}`)
-          .then(r => r.json())
-          .then(updated => setSelectedInv(updated));
+        if (selectedInv) {
+          const invKey = selectedInv.invoiceNo || selectedInv.invoice_no;
+          fetch(`${API_BASE}/api/invoice/by-no/${encodeURIComponent(invKey)}`)
+            .then(r => r.json())
+            .then(updated => setSelectedInv(updated));
+        }
       })
       .catch(err => alert("Error updating invoice balance"));
+  };
+
+  const handlePrintSelectedTaxInvoice = () => {
+    if (!selectedInv) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow pop-ups to print the final tax invoice.');
+      return;
+    }
+
+    const netAmt = parseFloat(selectedInv.netAmount ?? selectedInv.net_amount ?? 0);
+    const paidAmt = parseFloat(selectedInv.paidAmount ?? selectedInv.paid_amount ?? 0);
+    const dueAmt = parseFloat(selectedInv.dueAmount ?? selectedInv.due_amount ?? 0);
+    const latestPmt = selectedInv.payments && selectedInv.payments.length > 0 ? selectedInv.payments[selectedInv.payments.length - 1].amount : 0;
+    const initialAdv = Math.max(0, paidAmt - latestPmt);
+
+    const htmlContent = generateA5BillReceiptHTML({
+      invoiceNo: selectedInv.invoiceNo || selectedInv.invoice_no || 'INV/26-27/00001',
+      invoiceDate: selectedInv.date_formatted || selectedInv.invoiceDate || selectedInv.invoice_date || new Date().toLocaleString('en-GB'),
+      bookingNo: selectedInv.bookingNo || selectedInv.booking_no || '',
+      patientCode: selectedInv.patientCode || selectedInv.patient_code || '',
+      prefix: selectedInv.prefix || 'Mr.',
+      patientName: selectedInv.patientName || selectedInv.patient_name || 'Guest',
+      age: selectedInv.age || selectedInv.age_year || '',
+      ageUnit: 'Yrs',
+      sex: selectedInv.sex || 'Male',
+      patientType: selectedInv.patientType || 'GENERAL',
+      phone: selectedInv.phone || selectedInv.mobile_no || '',
+      address: selectedInv.address || '',
+      referredBy: selectedInv.referredBy || selectedInv.doctorName || selectedInv.doctor_name || 'Dr. SELF',
+      selectedTests: (selectedInv.items || []).map(item => ({
+        code: item.code || item.test_code || '',
+        name: item.name || item.testName || item.test_name || 'Diagnostic Test',
+        price: item.price ?? item.amount ?? 0,
+        delivery_date: item.delivery_date || 'Same Day'
+      })),
+      totalAmount: netAmt,
+      discountAmount: parseFloat(selectedInv.discountValue || 0),
+      netAmount: netAmt,
+      advanceReceived: initialAdv,
+      currentPayment: latestPmt,
+      totalPaid: paidAmt,
+      balanceDue: dueAmt,
+      paymentMethod: selectedInv.paymentMethod || 'Cash',
+      printedBy: 'Admin',
+    });
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   if (perms.isLoaded && perms.can_view === false) {
@@ -190,130 +246,144 @@ export default function InvoicePage() {
         </table>
       </div>
 
-      {/* Invoice Detail Modal */}
-      {selectedInv && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          backdropFilter: 'blur(4px)'
-        }}>
+      {selectedInv && (() => {
+        const invNo = selectedInv.invoiceNo || selectedInv.invoice_no || 'INV/26-27/00001';
+        const bkNo = selectedInv.bookingNo || selectedInv.booking_no || '';
+        const prefixStr = selectedInv.prefix || 'Mr.';
+        const nameStr = selectedInv.patientName || selectedInv.patient_name || 'Guest';
+        const ageVal = selectedInv.age || selectedInv.age_year || '';
+        const sexVal = selectedInv.sex || 'Male';
+        const invDtStr = selectedInv.date_formatted || selectedInv.invoiceDate || selectedInv.invoice_date || '';
+        const docNameStr = selectedInv.referredBy || selectedInv.doctorName || selectedInv.doctor_name || 'Dr. SELF';
+        const netAmtVal = parseFloat(selectedInv.netAmount ?? selectedInv.net_amount ?? 0);
+        const paidAmtVal = parseFloat(selectedInv.paidAmount ?? selectedInv.paid_amount ?? 0);
+        const dueAmtVal = parseFloat(selectedInv.dueAmount ?? selectedInv.due_amount ?? 0);
+
+        return (
           <div style={{
-            backgroundColor: 'var(--surface-container-lowest)',
-            border: '1px solid var(--outline-variant)',
-            borderRadius: 'var(--radius-xl)',
-            padding: '24px',
-            width: '100%',
-            maxWidth: '650px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.3)',
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+            backdropFilter: 'blur(4px)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--outline-variant)', paddingBottom: '12px' }}>
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary)', margin: 0 }}>
-                  Tax Invoice: {selectedInv.invoiceNo}
-                </h3>
-                <span style={{ fontSize: '12px', color: 'var(--outline)', fontFamily: 'var(--font-mono)' }}>Ref Booking: {selectedInv.bookingNo}</span>
+            <div style={{
+              backgroundColor: 'var(--surface-container-lowest)',
+              border: '1px solid var(--outline-variant)',
+              borderRadius: 'var(--radius-xl)',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '650px',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--outline-variant)', paddingBottom: '12px' }}>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary)', margin: 0 }}>
+                    Tax Invoice: {invNo}
+                  </h3>
+                  <span style={{ fontSize: '12px', color: 'var(--outline)', fontFamily: 'var(--font-mono)' }}>Ref Booking: {bkNo}</span>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setSelectedInv(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setSelectedInv(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
 
-            <div style={{ fontSize: '13px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px', backgroundColor: 'var(--surface-container-low)', borderRadius: 'var(--radius-lg)' }}>
-              <div><strong>Patient Name:</strong> {selectedInv.patientName}</div>
-              <div><strong>Age / Sex:</strong> {selectedInv.age} {selectedInv.sex}</div>
-              <div><strong>Invoice Date:</strong> {selectedInv.invoiceDate}</div>
-              <div><strong>Doctor:</strong> {selectedInv.doctorName || 'Self'}</div>
-            </div>
+              <div style={{ fontSize: '13px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px', backgroundColor: 'var(--surface-container-low)', borderRadius: 'var(--radius-lg)' }}>
+                <div><strong>Patient Name:</strong> {prefixStr} {nameStr}</div>
+                <div><strong>Age / Sex:</strong> {ageVal} Yrs / {sexVal}</div>
+                <div><strong>Invoice Date:</strong> {invDtStr}</div>
+                <div><strong>Doctor:</strong> {docNameStr}</div>
+              </div>
 
-            <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ backgroundColor: 'var(--surface-container-high)', textAlign: 'left' }}>
-                    <th style={{ padding: '8px 12px' }}>Test Name</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedInv.items || []).map((item, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--outline-variant)' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: '600' }}>{item.testName}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>₹ {parseFloat(item.price).toFixed(2)}</td>
+              <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: 'var(--surface-container-high)', textAlign: 'left' }}>
+                      <th style={{ padding: '8px 12px' }}>Test Name</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Rate</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface-container-low)', padding: '12px', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: selectedInv.dueAmount > 0 ? '#b45309' : '#15803d', fontWeight: '800', fontSize: '14px' }}>
-                <CheckCircle size={18} />
-                <span>STATUS: {selectedInv.status || (selectedInv.dueAmount > 0 ? 'PARTIALLY PAID' : 'FULLY PAID')}</span>
+                  </thead>
+                  <tbody>
+                    {(selectedInv.items || []).map((item, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--outline-variant)' }}>
+                        <td style={{ padding: '8px 12px', fontWeight: '600' }}>{item.name || item.testName || item.test_name || 'Diagnostic Test'}</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>₹ {parseFloat(item.price ?? item.amount ?? 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
-                <div style={{ fontSize: '12px', color: 'var(--outline)' }}>Net: ₹ {selectedInv.netAmount.toFixed(2)} | Paid: ₹ {selectedInv.paidAmount.toFixed(2)}</div>
-                <div style={{ fontSize: '15px', fontWeight: '800', color: selectedInv.dueAmount > 0 ? '#b3261e' : '#15803d' }}>
-                  {selectedInv.dueAmount > 0 ? `Due: ₹ ${selectedInv.dueAmount.toFixed(2)}` : 'Balance Due: Nil (Fully Paid)'}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface-container-low)', padding: '12px', borderRadius: 'var(--radius-lg)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: dueAmtVal > 0 ? '#b45309' : '#15803d', fontWeight: '800', fontSize: '14px' }}>
+                  <CheckCircle size={18} />
+                  <span>STATUS: {selectedInv.status || (dueAmtVal > 0 ? 'PARTIALLY PAID' : 'FULLY PAID')}</span>
+                </div>
+                <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--outline)' }}>Net: ₹ {netAmtVal.toFixed(2)} | Paid: ₹ {paidAmtVal.toFixed(2)}</div>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: dueAmtVal > 0 ? '#b3261e' : '#15803d' }}>
+                    {dueAmtVal > 0 ? `Due: ₹ ${dueAmtVal.toFixed(2)}` : 'Balance Due: Nil (Fully Paid)'}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '8px' }}>
-              {selectedInv.dueAmount > 0 && (
-                <PermissionButton
-                  moduleKey="invoice"
-                  action="can_add"
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '8px' }}>
+                {dueAmtVal > 0 && (
+                  <PermissionButton
+                    moduleKey="invoice"
+                    action="can_add"
+                    type="button"
+                    onClick={() => handleSettleBalanceInInvoice(bkNo, dueAmtVal)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 16px',
+                      backgroundColor: '#059669',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: 'var(--radius-lg)',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✓ Collect Balance ₹ {dueAmtVal.toFixed(2)} & Convert to FULLY PAID
+                  </PermissionButton>
+                )}
+                <button
                   type="button"
-                  onClick={() => handleSettleBalanceInInvoice(selectedInv.bookingNo, selectedInv.dueAmount)}
+                  onClick={handlePrintSelectedTaxInvoice}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
                     padding: '8px 16px',
-                    backgroundColor: '#059669',
+                    backgroundColor: 'var(--secondary)',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: 'var(--radius-lg)',
-                    fontWeight: '800'
+                    fontWeight: '700',
+                    cursor: 'pointer'
                   }}
                 >
-                  ✓ Collect Balance ₹ {selectedInv.dueAmount.toFixed(2)} & Convert to FULLY PAID
-                </PermissionButton>
-              )}
-              <button
-                type="button"
-                onClick={() => window.print()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  backgroundColor: 'var(--secondary)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: 'var(--radius-lg)',
-                  fontWeight: '700',
-                  cursor: 'pointer'
-                }}
-              >
-                <Printer size={16} /> Print Tax Invoice
-              </button>
+                  <Printer size={16} /> Print Final Tax Invoice (A5)
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
