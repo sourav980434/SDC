@@ -97,6 +97,71 @@ export function generateA5BookingReceiptHTML(data) {
       position: relative;
     }
 
+    /* Circular Rubber Stamp Seal Watermark */
+    .watermark-stamp {
+      position: absolute;
+      top: 52%;
+      left: 48%;
+      transform: translate(-50%, -50%) rotate(-14deg);
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      user-select: none;
+      opacity: 0.25;
+    }
+
+    .stamp-paid {
+      border: 4px double #15803d;
+      color: #15803d;
+      box-shadow: inset 0 0 0 2px #15803d;
+    }
+
+    .stamp-due {
+      border: 4px double #b91c1c;
+      color: #b91c1c;
+      box-shadow: inset 0 0 0 2px #b91c1c;
+    }
+
+    .stamp-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.1;
+      padding: 4px;
+    }
+
+    .stamp-org {
+      font-size: 7.5px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .stamp-text {
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin: 4px 0;
+      border-top: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      padding: 2px 6px;
+      white-space: nowrap;
+    }
+
+    .stamp-date {
+      font-size: 8px;
+      font-weight: 800;
+      font-family: monospace;
+    }
+
     /* Header Section */
     .header-table {
       width: 100%;
@@ -349,6 +414,15 @@ export function generateA5BookingReceiptHTML(data) {
 <body>
 
   <div class="receipt-container">
+
+    <!-- Circular Rubber Stamp Seal Watermark -->
+    <div class="watermark-stamp ${isFullyPaid ? 'stamp-paid' : 'stamp-due'}">
+      <div class="stamp-inner">
+        <div class="stamp-org">SANTOSHPUR DIAGNOSTIC</div>
+        <div class="stamp-text">${isFullyPaid ? 'FULLY PAID' : 'BALANCE DUE'}</div>
+        <div class="stamp-date">${bookingDate ? bookingDate.split(' ')[0] : ''}</div>
+      </div>
+    </div>
     
     <!-- Top Header -->
     <table class="header-table">
