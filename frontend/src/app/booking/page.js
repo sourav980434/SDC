@@ -1077,6 +1077,20 @@ export default function NewBooking() {
     }
   };
 
+  const reloadCurrentBooking = (bkNo) => {
+    if (!bkNo) return;
+    const serialStr = bkNo.split('/').pop() || bkNo;
+    fetch(`${API_BASE}/api/booking/by-no/${serialStr}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && !data.error) {
+          setPaymentsList(data.payments || []);
+          setReceivedAmount('');
+        }
+      })
+      .catch(err => console.error("Error refreshing booking state:", err));
+  };
+
   const executeGenerateInvoice = (targetBkNo, collectAmount, payMode) => {
     fetch(`${API_BASE}/api/invoice/generate`, {
       method: 'POST',
@@ -1091,6 +1105,7 @@ export default function NewBooking() {
       .then(data => {
         setShowSettlementModal(false);
         if (data.invoice_no) {
+          reloadCurrentBooking(targetBkNo);
           const serialStr = data.invoice_no.split('/').pop() || data.invoice_no;
           fetch(`${API_BASE}/api/invoice/by-no/${serialStr}`)
             .then(r => r.json())
@@ -2845,7 +2860,10 @@ export default function NewBooking() {
               </div>
               <button 
                 type="button" 
-                onClick={() => setShowFinalInvoiceModal(false)}
+                onClick={() => {
+                  setShowFinalInvoiceModal(false);
+                  reloadCurrentBooking(savedBookingNo || bookingNo);
+                }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
               >
                 <X size={20} />
@@ -2919,7 +2937,10 @@ export default function NewBooking() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--outline-variant)', paddingTop: '16px' }}>
               <button
                 type="button"
-                onClick={() => setShowFinalInvoiceModal(false)}
+                onClick={() => {
+                  setShowFinalInvoiceModal(false);
+                  reloadCurrentBooking(savedBookingNo || bookingNo);
+                }}
                 style={{
                   padding: '8px 16px',
                   borderRadius: 'var(--radius-lg)',
