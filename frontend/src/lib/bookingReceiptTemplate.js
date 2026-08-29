@@ -29,7 +29,7 @@ export function generateA5BookingReceiptHTML(data) {
 
   // Check if any selected test requires fasting prep
   const hasFastingTest = selectedTests.some((t) => {
-    const name = (t.test_name || t.Descr || '').toUpperCase();
+    const name = (t.name || t.test_name || t.testName || t.Descr || '').toUpperCase();
     return (
       name.includes('FASTING') ||
       name.includes('SUGAR') ||
@@ -46,7 +46,7 @@ export function generateA5BookingReceiptHTML(data) {
   let badgeBg = '#dcfce7';
 
   if (!isFullyPaid && !isUnpaid) {
-    paymentStatusBadge = 'PARTIAL PAYMENT (ADVANCE)';
+    paymentStatusBadge = 'PARTIAL PAYMENT';
     badgeColor = '#b45309'; // Amber
     badgeBg = '#fef3c7';
   } else if (isUnpaid) {
@@ -69,7 +69,7 @@ export function generateA5BookingReceiptHTML(data) {
   <style>
     @page {
       size: A5 landscape;
-      margin: 6mm 8mm;
+      margin: 4mm 6mm;
     }
     
     * {
@@ -79,13 +79,13 @@ export function generateA5BookingReceiptHTML(data) {
       font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
     }
 
-    body {
+    html, body {
       background: #ffffff;
       color: #0f172a;
       font-size: 11px;
       line-height: 1.35;
-      padding: 8px 12px;
-      max-width: 210mm;
+      padding: 6px 10px;
+      width: 210mm;
       margin: 0 auto;
     }
 
@@ -121,18 +121,6 @@ export function generateA5BookingReceiptHTML(data) {
       margin-top: 1px;
     }
 
-    .badge-nabl {
-      display: inline-block;
-      background: #070a61;
-      color: #ffffff;
-      font-size: 8px;
-      font-weight: 800;
-      padding: 2px 6px;
-      border-radius: 3px;
-      letter-spacing: 0.5px;
-      margin-top: 3px;
-    }
-
     .voucher-title-box {
       text-align: right;
     }
@@ -150,8 +138,8 @@ export function generateA5BookingReceiptHTML(data) {
     }
 
     .qr-box {
-      width: 54px;
-      height: 54px;
+      width: 52px;
+      height: 52px;
       border: 1px solid #cbd5e1;
       border-radius: 4px;
       padding: 2px;
@@ -188,12 +176,13 @@ export function generateA5BookingReceiptHTML(data) {
       display: inline-block;
       padding: 2px 8px;
       border-radius: 12px;
-      font-size: 9px;
+      font-size: 8.5px;
       font-weight: 800;
       background: ${badgeBg};
       color: ${badgeColor};
       border: 1px solid ${badgeColor};
       text-transform: uppercase;
+      white-space: nowrap;
     }
 
     /* Itemized Test Table */
@@ -339,7 +328,13 @@ export function generateA5BookingReceiptHTML(data) {
     }
 
     @media print {
-      body {
+      @page {
+        size: A5 landscape;
+        margin: 4mm 6mm;
+      }
+      html, body {
+        width: 210mm;
+        height: 148mm;
         padding: 0;
       }
       .receipt-container {
@@ -361,7 +356,6 @@ export function generateA5BookingReceiptHTML(data) {
         <td>
           <div class="org-title">Santoshpur Diagnostic Centre & Polyclinic</div>
           <div class="org-subtitle">Santoshpur, South 24 Parganas, WB • Phone: +91 9804349061</div>
-          <div class="badge-nabl">NABL ACCREDITED QUALITY LAB • REG NO: WB/KOL/CL/2026/0891</div>
         </td>
         <td class="voucher-title-box">
           <div class="voucher-title">BOOKING RECEIPT</div>
@@ -417,7 +411,7 @@ export function generateA5BookingReceiptHTML(data) {
                   (t, idx) => `
           <tr>
             <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
-            <td style="font-weight: 600;">${t.test_name || t.Descr || 'Diagnostic Test'}</td>
+            <td style="font-weight: 600;">${t.name || t.test_name || t.testName || t.Descr || t.code || 'Diagnostic Test'}</td>
             <td style="text-align: right; font-family: monospace; font-weight: 700;">₹ ${parseFloat(t.price || t.Rate || 0).toFixed(2)}</td>
             <td style="text-align: center; font-weight: 600; color: #475569;">${t.delivery_date || 'Same Day'}</td>
           </tr>
