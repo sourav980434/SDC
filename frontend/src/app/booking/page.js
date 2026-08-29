@@ -28,6 +28,7 @@ import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
 import { generateA5BookingReceiptHTML } from '@/lib/bookingReceiptTemplate';
 import { generateA5BillReceiptHTML } from '@/lib/billReceiptTemplate';
 import { generateA5PartPaymentReceiptHTML } from '@/lib/partPaymentReceiptTemplate';
+import { generateA5DepartmentSlipsHTML } from '@/lib/deptSlipTemplate';
 
 export default function NewBooking() {
   const { shortcuts, parseKeyEvent } = useHotkeys();
@@ -1134,6 +1135,45 @@ export default function NewBooking() {
     printWindow.document.close();
   };
 
+  const handlePrintDeptSlips = () => {
+    if (!patientName.trim()) {
+      alert('Please enter patient name first.');
+      nameRef.current?.focus();
+      return;
+    }
+    if (selectedTests.length === 0) {
+      alert('Please select at least one test.');
+      searchRef.current?.focus();
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow pop-ups to print department slips.');
+      return;
+    }
+
+    const htmlContent = generateA5DepartmentSlipsHTML({
+      bookingNo: savedBookingNo || bookingNo,
+      bookingDate: currentDate && currentTime ? `${currentDate} ${currentTime}` : new Date().toLocaleString('en-GB'),
+      patientCode,
+      prefix,
+      patientName,
+      age,
+      ageUnit,
+      sex,
+      patientType: selectedCategory || 'GENERAL',
+      phone,
+      address,
+      referredBy: referredBy || 'Dr. SELF',
+      selectedTests,
+      printedBy: activeUserSession?.user_name || 'Admin',
+    });
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   const handleClearForm = () => {
     lastSelectedNameRef.current = '';
     lastSelectedPhoneRef.current = '';
@@ -2101,11 +2141,12 @@ export default function NewBooking() {
           <div className={styles.quickLinksGrid}>
             <div 
               className={styles.quickLinkCard}
-              onClick={handleOpenHistoryModal}
+              onClick={handlePrintDeptSlips}
               style={{ cursor: 'pointer' }}
+              title="Print Departmental Work Slips (rptbookingslip_dep transfer)"
             >
-              <History size={24} style={{ color: 'var(--secondary)' }} />
-              <span className={styles.quickLinkCardSpan}>Last 5 Bookings</span>
+              <FileText size={24} style={{ color: 'var(--secondary)' }} />
+              <span className={styles.quickLinkCardSpan}>Department Slip</span>
             </div>
             <div className={styles.quickLinkCard}>
               <Users size={24} style={{ color: 'var(--secondary)' }} />
