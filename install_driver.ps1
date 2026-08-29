@@ -59,31 +59,28 @@ if (-not $pdoDll -or -not $sqlDll) {
 
 $destExt = "C:\xampp\php\ext"
 
-# Copy original versioned filenames
+# Copy versioned filenames and standardized alias copies (php_pdo_sqlsrv.dll & php_sqlsrv.dll)
 Copy-Item -Path $pdoDll.FullName -Destination (Join-Path $destExt $pdoDll.Name) -Force
 Copy-Item -Path $sqlDll.FullName -Destination (Join-Path $destExt $sqlDll.Name) -Force
-
-# Also copy standardized aliases (php_pdo_sqlsrv.dll & php_sqlsrv.dll) so all php.ini formats work
 Copy-Item -Path $pdoDll.FullName -Destination (Join-Path $destExt "php_pdo_sqlsrv.dll") -Force
 Copy-Item -Path $sqlDll.FullName -Destination (Join-Path $destExt "php_sqlsrv.dll") -Force
 
-Write-Host "      Copied $($pdoDll.Name) & php_pdo_sqlsrv.dll to $destExt" -ForegroundColor Green
-Write-Host "      Copied $($sqlDll.Name) & php_sqlsrv.dll to $destExt" -ForegroundColor Green
+Write-Host "      Copied driver DLLs to $destExt" -ForegroundColor Green
 
-# Update php.ini
-Write-Host "[4/4] Updating C:\xampp\php\php.ini configuration..." -ForegroundColor Yellow
+# Update & Clean php.ini to have exactly one clean directive
+Write-Host "[4/4] Optimizing C:\xampp\php\php.ini configuration..." -ForegroundColor Yellow
 $iniPath = "C:\xampp\php\php.ini"
-$iniText = Get-Content $iniPath -Raw
+$iniLines = Get-Content $iniPath
 
-$pdoLine = "extension=$($pdoDll.Name)"
-$sqlLine = "extension=$($sqlDll.Name)"
-
-if ($iniText -notmatch [regex]::Escape($pdoLine)) {
-    Add-Content -Path $iniPath -Value "`n$pdoLine`n$sqlLine"
-    Write-Host "      Enabled extensions in php.ini" -ForegroundColor Green
-} else {
-    Write-Host "      Extensions present in php.ini" -ForegroundColor Gray
+# Filter out any old or duplicate sqlsrv directives
+$cleanedLines = $iniLines | Where-Object { 
+    $_ -notmatch "extension\s*=\s*.*pdo_sqlsrv" -and $_ -notmatch "extension\s*=\s*.*sqlsrv" 
 }
+
+# Append clean single directives
+$finalLines = $cleanedLines + "extension=php_pdo_sqlsrv.dll" + "extension=php_sqlsrv.dll"
+Set-Content -Path $iniPath -Value $finalLines
+Write-Host "      Cleaned duplicate directives in php.ini" -ForegroundColor Green
 
 # Cleanup
 Remove-Item -Path $tempZip -Force -ErrorAction SilentlyContinue
