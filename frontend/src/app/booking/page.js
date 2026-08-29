@@ -1176,6 +1176,8 @@ export default function NewBooking() {
     }
 
     const currentTotalPaid = parseFloat(receivedAmount || 0);
+    const calculatedPaid = paymentsList.length > 0 ? (totalPaid + currentTotalPaid) : currentTotalPaid;
+    const calcDue = grandTotal - calculatedPaid;
 
     const htmlContent = generateA5BookingReceiptHTML({
       bookingNo: savedBookingNo || bookingNo,
@@ -1192,10 +1194,10 @@ export default function NewBooking() {
       referredBy,
       selectedTests,
       totalAmount: subtotal,
-      discountAmount: discountAmount,
+      discountAmount: discount,
       grandTotal: grandTotal,
-      advanceReceived: currentTotalPaid,
-      balanceDue: balanceDue,
+      advanceReceived: calculatedPaid,
+      balanceDue: calcDue,
       paymentMethod,
       printedBy: activeUserSession?.user_name || 'Admin',
     });
