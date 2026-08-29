@@ -67,7 +67,7 @@ export default function InvoicePage() {
     });
 
     // Asynchronously fetch extra items & payment details
-    fetch(`${API_BASE}/api/invoice/by-no/${encodeURIComponent(invRow.invoice_no)}`)
+    fetch(`${API_BASE}/api/invoice/details?inv_no=${encodeURIComponent(invRow.invoice_no)}`)
       .then(res => res.json())
       .then(data => {
         if (!data.error) {
@@ -103,7 +103,7 @@ export default function InvoicePage() {
         fetchInvoices(search);
         if (selectedInv) {
           const invKey = selectedInv.invoiceNo || selectedInv.invoice_no;
-          fetch(`${API_BASE}/api/invoice/by-no/${encodeURIComponent(invKey)}`)
+          fetch(`${API_BASE}/api/invoice/details?inv_no=${encodeURIComponent(invKey)}`)
             .then(r => r.json())
             .then(updated => {
               setSelectedInv(updated);
@@ -130,35 +130,46 @@ export default function InvoicePage() {
     const latestPmt = invData.payments && invData.payments.length > 0 ? invData.payments[invData.payments.length - 1].amount : 0;
     const initialAdv = Math.max(0, paidAmt - latestPmt);
 
+    const safeInvoiceNo = invData.invoiceNo || invData.invoice_no || 'INV/26-27/01001';
+    const safeBookingNo = invData.bookingNo || invData.booking_no || '';
+    const safePatientName = invData.patientName || invData.patient_name || 'Guest';
+    const safePrefix = invData.prefix || 'Mr.';
+    const safeAge = invData.age || invData.age_year || '';
+    const safeSex = invData.sex || 'Male';
+    const safePhone = invData.phone || invData.mobile_no || '';
+    const safeAddress = invData.address || '';
+    const safeReferredBy = invData.referredBy || invData.doctorName || invData.doctor_name || 'Dr. SELF';
+    const safeInvoiceDate = invData.date_formatted || invData.invoiceDate || invData.invoice_date || new Date().toLocaleString('en-GB');
+
     const htmlContent = generateA5BillReceiptHTML({
-      invoiceNo: invData.invoiceNo || invData.invoice_no || 'INV/26-27/00001',
-      invoiceDate: invData.date_formatted || invData.invoiceDate || invData.invoice_date || new Date().toLocaleString('en-GB'),
-      bookingNo: invData.bookingNo || invData.booking_no || '',
+      invoiceNo: safeInvoiceNo,
+      invoiceDate: safeInvoiceDate,
+      bookingNo: safeBookingNo,
       patientCode: invData.patientCode || invData.patient_code || '',
-      prefix: invData.prefix || 'Mr.',
-      patientName: invData.patientName || invData.patient_name || 'Guest',
-      age: invData.age || invData.age_year || '',
+      prefix: safePrefix,
+      patientName: safePatientName,
+      age: safeAge,
       ageUnit: 'Yrs',
-      sex: invData.sex || 'Male',
+      sex: safeSex,
       patientType: invData.patientType || 'GENERAL',
-      phone: invData.phone || invData.mobile_no || '',
-      address: invData.address || '',
-      referredBy: invData.referredBy || invData.doctorName || invData.doctor_name || 'Dr. SELF',
+      phone: safePhone,
+      address: safeAddress,
+      referredBy: safeReferredBy,
       selectedTests: (invData.items || []).map(item => ({
         code: item.code || item.test_code || '',
         name: item.name || item.testName || item.test_name || item.Descr || 'Diagnostic Test',
         test_name: item.name || item.testName || item.test_name || item.Descr || 'Diagnostic Test',
-        price: item.price ?? item.amount ?? item.Rate ?? 0,
+        price: parseFloat(item.price ?? item.amount ?? item.Rate ?? 0),
         delivery_date: item.delivery_date || 'Same Day'
       })),
       totalAmount: netAmt,
-      discountAmount: parseFloat(invData.discountValue || 0),
+      discountAmount: parseFloat(invData.discountValue || invData.discount_value || 0),
       netAmount: netAmt,
       advanceReceived: initialAdv,
       currentPayment: latestPmt,
       totalPaid: paidAmt,
       balanceDue: dueAmt,
-      paymentMethod: invData.paymentMethod || 'Cash',
+      paymentMethod: invData.paymentMethod || invData.payment_mode || 'Cash',
       printedBy: 'Admin',
     });
 

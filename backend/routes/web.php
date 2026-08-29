@@ -1783,86 +1783,101 @@ Route::get('/api/invoice/list', function (Request $request) {
     return response()->json($invoices);
 });
 
-Route::get('/api/invoice/by-no/{invoiceNo}', function ($invoiceNo) {
-    $cleanNo = trim(urldecode($invoiceNo));
-    
-    $numNo = intval(preg_replace('/[^0-9]/', '', $cleanNo));
-    $paddedNo = $numNo > 0 ? str_pad($numNo, 5, '0', STR_PAD_LEFT) : '';
+if (!function_exists('getInvoiceDetailsResponse')) {
+    function getInvoiceDetailsResponse($invoiceNoInput) {
+        $cleanNo = trim(urldecode($invoiceNoInput));
+        
+        $numNo = intval(preg_replace('/[^0-9]/', '', $cleanNo));
+        $paddedNo = $numNo > 0 ? str_pad($numNo, 5, '0', STR_PAD_LEFT) : '';
 
-    $inv = DB::table('tbl_web_invoice_hdr as i')
-        ->leftJoin('tbl_web_booking_hdr as b', function($join) {
-            $join->on('i.booking_id', '=', 'b.id')
-                 ->orOn('i.booking_no', '=', 'b.booking_no');
-        })
-        ->where(function($q) use ($cleanNo, $numNo, $paddedNo) {
-            $q->where('i.invoice_no', $cleanNo)
-              ->orWhere('i.booking_no', $cleanNo);
-            if ($numNo > 0) {
-                $q->orWhere('i.invoice_no', 'like', "%/$paddedNo")
-                  ->orWhere('i.serial_no', $numNo);
-            }
-        })
-        ->select(
-            'i.*',
-            'b.patient_prefix as bk_prefix',
-            'b.patient_name as bk_patient_name',
-            'b.sex as bk_sex',
-            'b.age_year as bk_age_year',
-            'b.mobile_no as bk_mobile_no',
-            'b.address as bk_address',
-            'b.doctor_name as bk_doctor_name'
-        )->first();
+        $inv = DB::table('tbl_web_invoice_hdr as i')
+            ->leftJoin('tbl_web_booking_hdr as b', function($join) {
+                $join->on('i.booking_id', '=', 'b.id')
+                     ->orOn('i.booking_no', '=', 'b.booking_no');
+            })
+            ->where(function($q) use ($cleanNo, $numNo, $paddedNo) {
+                $q->where('i.invoice_no', $cleanNo)
+                  ->orWhere('i.booking_no', $cleanNo);
+                if ($numNo > 0) {
+                    $q->orWhere('i.invoice_no', 'like', "%/$paddedNo")
+                      ->orWhere('i.serial_no', $numNo);
+                }
+            })
+            ->select(
+                'i.*',
+                'b.patient_prefix as bk_prefix',
+                'b.patient_name as bk_patient_name',
+                'b.sex as bk_sex',
+                'b.age_year as bk_age_year',
+                'b.mobile_no as bk_mobile_no',
+                'b.address as bk_address',
+                'b.doctor_name as bk_doctor_name'
+            )->first();
 
-    if (!$inv) {
-        return response()->json(['error' => 'Invoice not found.'], 404);
+        if (!$inv) {
+            return response()->json(['error' => 'Invoice not found.'], 404);
+        }
+
+        $dtl = DB::table('tbl_web_booking_dtl')
+            ->where(function($q) use ($inv) {
+                if (!empty($inv->booking_id)) $q->where('booking_id', $inv->booking_id);
+                if (!empty($inv->booking_no)) $q->orWhere('booking_no', $inv->booking_no);
+            })
+            ->get();
+
+        $pmts = DB::table('tbl_web_payments')
+            ->where(function($q) use ($inv) {
+                if (!empty($inv->booking_id)) $q->where('booking_id', $inv->booking_id);
+                if (!empty($inv->booking_no)) $q->orWhere('booking_no', $inv->booking_no);
+            })
+            ->get();
+
+        return response()->json([
+            'invoiceNo' => $inv->invoice_no,
+            'bookingNo' => $inv->booking_no,
+            'patientCode' => $inv->patient_code,
+            'prefix' => !empty($inv->bk_prefix) ? $inv->bk_prefix : 'Mr.',
+            'patientName' => !empty($inv->patient_name) ? $inv->patient_name : ($inv->bk_patient_name ?? 'Guest'),
+            'sex' => !empty($inv->bk_sex) ? $inv->bk_sex : 'Male',
+            'age' => !empty($inv->bk_age_year) ? $inv->bk_age_year : '',
+            'phone' => !empty($inv->bk_mobile_no) ? $inv->bk_mobile_no : '',
+            'address' => !empty($inv->bk_address) ? $inv->bk_address : '',
+            'referredBy' => !empty($inv->bk_doctor_name) ? $inv->bk_doctor_name : 'Dr. SELF',
+            'subtotal' => floatval($inv->subtotal_amount),
+            'discountValue' => floatval($inv->discount_value),
+            'netAmount' => floatval($inv->net_amount),
+            'paidAmount' => floatval($inv->paid_amount),
+            'dueAmount' => floatval($inv->due_amount),
+            'status' => $inv->invoice_status,
+            'date_formatted' => !empty($inv->invoice_date) ? (new DateTime($inv->invoice_date))->format('d-M-Y h:i A') : '',
+            'items' => $dtl->map(function($d) {
+                return [
+                    'code' => $d->test_code ?? '',
+                    'name' => $d->test_name ?? $d->test_code ?? 'Diagnostic Test',
+                    'testName' => $d->test_name ?? $d->test_code ?? 'Diagnostic Test',
+                    'test_name' => $d->test_name ?? $d->test_code ?? 'Diagnostic Test',
+                    'price' => floatval($d->amount ?? $d->rate ?? 0)
+                ];
+            }),
+            'payments' => $pmts->map(function($p) {
+                return [
+                    'receipt_no' => $p->receipt_no ?? '',
+                    'date' => !empty($p->payment_date) ? (new DateTime($p->payment_date))->format('d-M-Y h:i A') : (!empty($p->created_at) ? (new DateTime($p->created_at))->format('d-M-Y h:i A') : ''),
+                    'amount' => floatval($p->amount ?? 0),
+                    'mode' => $p->payment_mode ?? 'Cash'
+                ];
+            })
+        ]);
     }
+}
 
-    $dtl = DB::table('tbl_web_booking_dtl')
-        ->where('booking_id', $inv->booking_id)
-        ->orWhere('booking_no', $inv->booking_no)
-        ->get();
+Route::get('/api/invoice/by-no/{invoiceNo}', function ($invoiceNo) {
+    return getInvoiceDetailsResponse($invoiceNo);
+})->where('invoiceNo', '.*');
 
-    $pmts = DB::table('tbl_web_payments')
-        ->where('booking_id', $inv->booking_id)
-        ->orWhere('booking_no', $inv->booking_no)
-        ->get();
-
-    return response()->json([
-        'invoiceNo' => $inv->invoice_no,
-        'bookingNo' => $inv->booking_no,
-        'patientCode' => $inv->patient_code,
-        'prefix' => $inv->bk_prefix ?? 'Mr.',
-        'patientName' => !empty($inv->patient_name) ? $inv->patient_name : ($inv->bk_patient_name ?? 'Guest'),
-        'sex' => !empty($inv->bk_sex) ? $inv->bk_sex : 'Male',
-        'age' => !empty($inv->bk_age_year) ? $inv->bk_age_year : '',
-        'phone' => !empty($inv->bk_mobile_no) ? $inv->bk_mobile_no : '',
-        'address' => !empty($inv->bk_address) ? $inv->bk_address : '',
-        'referredBy' => !empty($inv->bk_doctor_name) ? $inv->bk_doctor_name : 'Dr. SELF',
-        'subtotal' => floatval($inv->subtotal_amount),
-        'discountValue' => floatval($inv->discount_value),
-        'netAmount' => floatval($inv->net_amount),
-        'paidAmount' => floatval($inv->paid_amount),
-        'dueAmount' => floatval($inv->due_amount),
-        'status' => $inv->invoice_status,
-        'date_formatted' => !empty($inv->invoice_date) ? (new DateTime($inv->invoice_date))->format('d-M-Y h:i A') : '',
-        'items' => $dtl->map(function($d) {
-            return [
-                'code' => $d->test_code,
-                'name' => $d->test_name,
-                'testName' => $d->test_name,
-                'test_name' => $d->test_name,
-                'price' => floatval($d->amount)
-            ];
-        }),
-        'payments' => $pmts->map(function($p) {
-            return [
-                'receipt_no' => $p->receipt_no ?? '',
-                'date' => !empty($p->payment_date) ? (new DateTime($p->payment_date))->format('d-M-Y h:i A') : (!empty($p->created_at) ? (new DateTime($p->created_at))->format('d-M-Y h:i A') : ''),
-                'amount' => floatval($p->amount ?? 0),
-                'mode' => $p->payment_mode ?? 'Cash'
-            ];
-        })
-    ]);
+Route::get('/api/invoice/details', function (Request $request) {
+    $no = $request->query('inv_no', $request->query('no', ''));
+    return getInvoiceDetailsResponse($no);
 });
 
 // 9. LIS SAMPLE TRACKING & WORKLIST APIs

@@ -924,8 +924,7 @@ export default function NewBooking() {
         setShowSettlementModal(false);
         if (data.invoice_no) {
           reloadCurrentBooking(targetBkNo);
-          const serialStr = data.invoice_no.split('/').pop() || data.invoice_no;
-          fetch(`${API_BASE}/api/invoice/by-no/${serialStr}`)
+          fetch(`${API_BASE}/api/invoice/details?inv_no=${encodeURIComponent(data.invoice_no)}`)
             .then(r => r.json())
             .then(invData => {
               setGeneratedInvoiceData(invData);
