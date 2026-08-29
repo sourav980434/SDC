@@ -1785,14 +1785,23 @@ Route::get('/api/invoice/list', function (Request $request) {
 
 Route::get('/api/invoice/by-no/{invoiceNo}', function ($invoiceNo) {
     $cleanNo = trim(urldecode($invoiceNo));
+    
+    $numNo = intval(preg_replace('/[^0-9]/', '', $cleanNo));
+    $paddedNo = $numNo > 0 ? str_pad($numNo, 5, '0', STR_PAD_LEFT) : '';
 
     $inv = DB::table('tbl_web_invoice_hdr as i')
         ->leftJoin('tbl_web_booking_hdr as b', function($join) {
             $join->on('i.booking_id', '=', 'b.id')
                  ->orOn('i.booking_no', '=', 'b.booking_no');
         })
-        ->where('i.invoice_no', $cleanNo)
-        ->orWhere('i.booking_no', $cleanNo)
+        ->where(function($q) use ($cleanNo, $numNo, $paddedNo) {
+            $q->where('i.invoice_no', $cleanNo)
+              ->orWhere('i.booking_no', $cleanNo);
+            if ($numNo > 0) {
+                $q->orWhere('i.invoice_no', 'like', "%/$paddedNo")
+                  ->orWhere('i.serial_no', $numNo);
+            }
+        })
         ->select(
             'i.*',
             'b.patient_prefix as bk_prefix',
