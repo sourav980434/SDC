@@ -58,14 +58,17 @@ if (-not $pdoDll -or -not $sqlDll) {
 }
 
 $destExt = "C:\xampp\php\ext"
-$targetPdoPath = Join-Path $destExt $pdoDll.Name
-$targetSqlPath = Join-Path $destExt $sqlDll.Name
 
-Copy-Item -Path $pdoDll.FullName -Destination $targetPdoPath -Force
-Copy-Item -Path $sqlDll.FullName -Destination $targetSqlPath -Force
+# Copy original versioned filenames
+Copy-Item -Path $pdoDll.FullName -Destination (Join-Path $destExt $pdoDll.Name) -Force
+Copy-Item -Path $sqlDll.FullName -Destination (Join-Path $destExt $sqlDll.Name) -Force
 
-Write-Host "      Copied $($pdoDll.Name) to $destExt" -ForegroundColor Green
-Write-Host "      Copied $($sqlDll.Name) to $destExt" -ForegroundColor Green
+# Also copy standardized aliases (php_pdo_sqlsrv.dll & php_sqlsrv.dll) so all php.ini formats work
+Copy-Item -Path $pdoDll.FullName -Destination (Join-Path $destExt "php_pdo_sqlsrv.dll") -Force
+Copy-Item -Path $sqlDll.FullName -Destination (Join-Path $destExt "php_sqlsrv.dll") -Force
+
+Write-Host "      Copied $($pdoDll.Name) & php_pdo_sqlsrv.dll to $destExt" -ForegroundColor Green
+Write-Host "      Copied $($sqlDll.Name) & php_sqlsrv.dll to $destExt" -ForegroundColor Green
 
 # Update php.ini
 Write-Host "[4/4] Updating C:\xampp\php\php.ini configuration..." -ForegroundColor Yellow
@@ -79,7 +82,7 @@ if ($iniText -notmatch [regex]::Escape($pdoLine)) {
     Add-Content -Path $iniPath -Value "`n$pdoLine`n$sqlLine"
     Write-Host "      Enabled extensions in php.ini" -ForegroundColor Green
 } else {
-    Write-Host "      Extensions already present in php.ini" -ForegroundColor Gray
+    Write-Host "      Extensions present in php.ini" -ForegroundColor Gray
 }
 
 # Cleanup
