@@ -115,11 +115,18 @@ export default function InvoicePage() {
   };
 
   const handlePrintSelectedTaxInvoice = (targetInv = null) => {
-    const rawInv = targetInv || selectedInv;
-    if (!rawInv) return;
+    const isEvent = targetInv && (targetInv.nativeEvent || typeof targetInv.preventDefault === 'function');
+    const rawInv = (isEvent ? selectedInv : targetInv) || selectedInv;
+    if (!rawInv) {
+      alert("No invoice selected for printing.");
+      return;
+    }
 
     const invKey = rawInv.invoiceNo || rawInv.invoice_no || rawInv.bookingNo || rawInv.booking_no;
-    if (!invKey) return;
+    if (!invKey) {
+      alert("Invalid invoice reference number.");
+      return;
+    }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -437,7 +444,7 @@ export default function InvoicePage() {
                 )}
                 <button
                   type="button"
-                  onClick={handlePrintSelectedTaxInvoice}
+                  onClick={() => handlePrintSelectedTaxInvoice(selectedInv)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
