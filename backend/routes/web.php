@@ -1153,6 +1153,10 @@ Route::post('/api/booking/save', function (Request $request) {
         'selectedTests' => 'required|array',
         'discountType' => 'nullable|string',
         'discountValue' => 'nullable|numeric',
+        'collectionCharge' => 'nullable|numeric',
+        'procedureCharge' => 'nullable|numeric',
+        'collection_charge' => 'nullable|numeric',
+        'procedure_charge' => 'nullable|numeric',
         'receivedAmount' => 'nullable|numeric',
         'paymentMethod' => 'nullable|string',
     ]);

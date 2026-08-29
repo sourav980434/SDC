@@ -1221,6 +1221,8 @@ export default function NewBooking() {
     setSelectedTests([]);
     setDiscountType('percent');
     setDiscountValue('');
+    setCollectionCharge('');
+    setProcedureCharge('');
     setReceivedAmount('');
     setPaymentMode('full');
     setTestSearch('');
