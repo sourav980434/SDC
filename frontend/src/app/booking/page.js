@@ -27,6 +27,7 @@ import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
 import { generateA5BookingReceiptHTML } from '@/lib/bookingReceiptTemplate';
 import { generateA5BillReceiptHTML } from '@/lib/billReceiptTemplate';
+import { generateA5PartPaymentReceiptHTML } from '@/lib/partPaymentReceiptTemplate';
 
 export default function NewBooking() {
   const { shortcuts, parseKeyEvent } = useHotkeys();
@@ -873,191 +874,7 @@ export default function NewBooking() {
       });
   };
 
-  const handlePrintPartPayment = (payment, partPaymentNum) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert("Please allow pop-ups to print the receipt.");
-      return;
-    }
 
-    const currentIdx = paymentsList.findIndex(p => p.id === payment.id);
-    const prevPayments = paymentsList.slice(0, currentIdx);
-    const prevTotalPaid = prevPayments.reduce((sum, p) => sum + p.amount, 0);
-    const cumulativePaid = prevTotalPaid + payment.amount;
-    const currentBalance = grandTotal - cumulativePaid;
-
-    const isReceiptFullyPaid = currentBalance <= 0;
-    let receiptStatusText = '';
-    if (isReceiptFullyPaid) {
-      receiptStatusText = 'Full Payment';
-    } else {
-      receiptStatusText = partPaymentNum === 1 ? 'Advance Payment' : 'Part Payment';
-    }
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${receiptStatusText} Receipt - \${payment.id}</title>
-          <style>
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              padding: 40px;
-              color: #333;
-              max-width: 500px;
-              margin: auto;
-              border: 1px solid #ddd;
-              box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px solid #070a61;
-              padding-bottom: 12px;
-              margin-bottom: 20px;
-            }
-            .header h2 {
-              margin: 0;
-              color: #070a61;
-              font-size: 22px;
-            }
-            .header p {
-              margin: 4px 0 0 0;
-              font-size: 12px;
-              color: #666;
-            }
-            .title {
-              text-align: center;
-              font-weight: bold;
-              font-size: 16px;
-              margin-bottom: 20px;
-              text-transform: uppercase;
-              letter-spacing: 1px;
-            }
-            .row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 8px;
-              font-size: 13.5px;
-            }
-            .row label {
-              color: #666;
-            }
-            .row span {
-              font-weight: 600;
-            }
-            .divider {
-              border-top: 1px solid #ddd;
-              margin: 15px 0;
-            }
-            .amount-section {
-              background-color: #f7f8ff;
-              border: 1px solid #e2e4ff;
-              border-radius: 8px;
-              padding: 12px;
-              margin-top: 15px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              font-size: 11px;
-              color: #888;
-            }
-            @media print {
-              body {
-                border: none;
-                box-shadow: none;
-                padding: 10px;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h2>Santoshpur Diagnostic Centre</h2>
-            <p>SANTOSHPUR, SOUTH 24 PARGANAS, WEST BENGAL</p>
-            <p>Phone: +91 9804349061 • Email: info@santoshpurdiagnostic.com</p>
-          </div>
-          <div class="title">\${receiptStatusText} Receipt</div>
-          
-          <div class="row">
-            <label>Booking No:</label>
-            <span>\${bookingNo}</span>
-          </div>
-          <div class="row">
-            <label>Receipt No:</label>
-            <span style="font-family: monospace;">\${payment.id}</span>
-          </div>
-          <div class="row">
-            <label>Date & Time:</label>
-            <span>\${payment.date} \${payment.time}</span>
-          </div>
-          <div class="row">
-            <label>Patient Name:</label>
-            <span>\${prefix} \${patientName}</span>
-          </div>
-          <div class="row">
-            <label>Referred Doctor:</label>
-            <span>\${referredBy || 'Self'}</span>
-          </div>
- 
-          <div class="divider"></div>
- 
-          <div class="row">
-            <label>Bill Grand Total:</label>
-            <span>₹ \${grandTotal.toFixed(2)}</span>
-          </div>
-          <div class="row">
-            <label>Part Payment Number:</label>
-            <span>#\${partPaymentNum}</span>
-          </div>
- 
-          <div class="amount-section">
-            <div class="row" style="font-size: 15px;">
-              <label style="color: #070a61; font-weight: bold;">Amount Received:</label>
-              <span style="color: #070a61; font-weight: bold;">₹ \${payment.amount.toFixed(2)}</span>
-            </div>
-            <div class="row" style="font-size: 13px; margin-top: 6px;">
-              <label>Payment Status:</label>
-              <span style="font-weight: bold; color: \${isReceiptFullyPaid ? '#2e7d32' : '#ed6c02'}">\${receiptStatusText}</span>
-            </div>
-            <div class="row" style="font-size: 13px; margin-top: 6px;">
-              <label>Payment Method:</label>
-              <span>\${payment.method}</span>
-            </div>
-          </div>
- 
-          <div class="divider"></div>
- 
-          <div class="row">
-            <label>Previously Paid:</label>
-            <span>₹ \${prevTotalPaid.toFixed(2)}</span>
-          </div>
-          <div class="row">
-            <label>Total Paid to Date:</label>
-            <span style="color: #2e7d32;">₹ \${cumulativePaid.toFixed(2)}</span>
-          </div>
-          <div class="row">
-            <label>Current Outstanding Balance:</label>
-            <span style="color: \${currentBalance > 0 ? '#b3261e' : '#2e7d32'}; font-weight: bold;">
-              \${currentBalance > 0 ? \`₹ \${currentBalance.toFixed(2)}\` : 'Nil (Fully Paid)'}
-            </span>
-          </div>
- 
-          <div class="footer">
-            <p>This is a computer-generated \${receiptStatusText.toLowerCase()} receipt and does not require a physical signature.</p>
-            <p>Thank you for choosing Santoshpur Diagnostic Centre.</p>
-          </div>
- 
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
 
   const handleGenerateFinalInvoice = () => {
     const targetBkNo = savedBookingNo || bookingNo;
@@ -1265,6 +1082,52 @@ export default function NewBooking() {
       balanceDue: currentInvDue,
       paymentMethod: generatedInvoiceData.paymentMethod || paymentMethod || 'Cash',
       printedBy: activeUserSession?.user_name || 'Admin',
+    });
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const handlePrintPartPayment = (paymentRecord, partSeq, prevPaid = 0, cumulativePaid = 0) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow pop-ups to print the part payment receipt.');
+      return;
+    }
+
+    const currentPayAmt = parseFloat(paymentRecord.amount || paymentRecord.paid_amount || 0);
+    const prevPaidAmt = parseFloat(prevPaid || 0);
+    const cumulativeAmt = parseFloat(cumulativePaid || (prevPaidAmt + currentPayAmt));
+    const calcDue = Math.max(0, grandTotal - cumulativeAmt);
+
+    const bkNoStr = savedBookingNo || bookingNo || 'BK/26-27/00001';
+    const bkParts = bkNoStr.split('/');
+    const fyPart = bkParts.length >= 2 ? bkParts[1] : '26-27';
+    const serialPart = bkParts.length >= 3 ? bkParts[2] : '00001';
+
+    const htmlContent = generateA5PartPaymentReceiptHTML({
+      receiptNo: paymentRecord.receipt_no || `RCP/${fyPart}/${serialPart}-P${partSeq}`,
+      receiptDate: paymentRecord.date || paymentRecord.created_at || (currentDate && currentTime ? `${currentDate} ${currentTime}` : new Date().toLocaleString('en-GB')),
+      bookingNo: bkNoStr,
+      patientCode,
+      prefix,
+      patientName,
+      age,
+      ageUnit,
+      sex,
+      patientType: selectedCategory || 'GENERAL',
+      phone,
+      address,
+      referredBy: referredBy || 'Dr. SELF',
+      selectedTests,
+      grandTotal,
+      previousPaid: prevPaidAmt,
+      currentPayment: currentPayAmt,
+      totalPaid: cumulativeAmt,
+      balanceDue: calcDue,
+      paymentMethod: paymentRecord.mode || paymentRecord.method || paymentRecord.payment_mode || 'Cash',
+      partSeq: partSeq,
+      printedBy: paymentRecord.received_by || paymentRecord.user || activeUserSession?.user_name || 'Admin',
     });
 
     printWindow.document.write(htmlContent);
@@ -2647,26 +2510,32 @@ export default function NewBooking() {
                       <div style={{ fontWeight: '700', fontSize: '14.5px', color: 'var(--secondary)', fontFamily: 'var(--font-mono)' }}>
                         ₹ {p.amount.toFixed(2)}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handlePrintPartPayment(p, partPaymentNum)}
-                        style={{
-                          padding: '6px 10px',
-                          backgroundColor: 'transparent',
-                          border: '1px solid var(--secondary)',
-                          color: 'var(--secondary)',
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <Printer size={14} />
-                        Print
-                      </button>
+                      {partPaymentNum === 1 ? (
+                        <span style={{ fontSize: '11px', color: 'var(--outline)', fontStyle: 'italic', padding: '4px 8px', backgroundColor: 'var(--surface-container-high)', borderRadius: 'var(--radius-md)' }}>
+                          (Covered in Main Booking Receipt)
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handlePrintPartPayment(p, partPaymentNum, prevPaid, cumulativePaid)}
+                          style={{
+                            padding: '6px 10px',
+                            backgroundColor: 'transparent',
+                            border: '1px solid var(--secondary)',
+                            color: 'var(--secondary)',
+                            borderRadius: 'var(--radius-md)',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Printer size={14} />
+                          Print Receipt
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
