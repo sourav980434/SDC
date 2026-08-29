@@ -150,6 +150,17 @@ export default function NewBooking() {
   const collectorRef = useRef(null);
   const searchRef = useRef(null);
   const receivedAmountRef = useRef(null);
+  const discountValueRef = useRef(null);
+  const discountTypeRef = useRef(null);
+  const collectionChargeRef = useRef(null);
+  const procedureChargeRef = useRef(null);
+  const paymentMethodSelectRef = useRef(null);
+  const saveBookingBtnRef = useRef(null);
+  const printReceiptBtnRef = useRef(null);
+  const generateTaxInvBtnRef = useRef(null);
+  const sendWhatsappBtnRef = useRef(null);
+  const deptSlipBtnRef = useRef(null);
+  const searchPatientBtnRef = useRef(null);
   const drContainerRef = useRef(null);
   const testContainerRef = useRef(null);
 
@@ -725,6 +736,8 @@ export default function NewBooking() {
     }
   };
 
+
+
   // Calculations
   const subtotal = selectedTests.reduce((sum, t) => sum + t.price, 0);
   
@@ -1240,8 +1253,8 @@ export default function NewBooking() {
           alert('Please select at least one test.');
           return;
         }
-        receivedAmountRef.current?.focus();
-        receivedAmountRef.current?.select();
+        discountValueRef.current?.focus();
+        if (discountValueRef.current?.select) discountValueRef.current.select();
       }
       return;
     }
@@ -1842,12 +1855,19 @@ export default function NewBooking() {
                 <span>Discount</span>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <input
+                    ref={discountValueRef}
                     type="number"
                     value={discountValue}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (parseFloat(val) >= 0 || val === '') {
                         setDiscountValue(val);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        discountTypeRef.current?.focus();
                       }
                     }}
                     placeholder="0"
@@ -1866,8 +1886,15 @@ export default function NewBooking() {
                     min="0"
                   />
                   <select
+                    ref={discountTypeRef}
                     value={discountType}
                     onChange={(e) => setDiscountType(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        collectionChargeRef.current?.focus();
+                      }
+                    }}
                     style={{
                       padding: '4px 6px',
                       border: '1px solid var(--outline-variant)',
@@ -1897,12 +1924,19 @@ export default function NewBooking() {
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--outline)' }}>₹</span>
                   <input
+                    ref={collectionChargeRef}
                     type="number"
                     value={collectionCharge}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (parseFloat(val) >= 0 || val === '') {
                         setCollectionCharge(val);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        procedureChargeRef.current?.focus();
                       }
                     }}
                     placeholder="0"
@@ -1929,12 +1963,23 @@ export default function NewBooking() {
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--outline)' }}>₹</span>
                   <input
+                    ref={procedureChargeRef}
                     type="number"
                     value={procedureCharge}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (parseFloat(val) >= 0 || val === '') {
                         setProcedureCharge(val);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (!isFullyPaid) {
+                          receivedAmountRef.current?.focus();
+                        } else {
+                          saveBookingBtnRef.current?.focus();
+                        }
                       }
                     }}
                     placeholder="0"
@@ -2106,6 +2151,7 @@ export default function NewBooking() {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
+                            paymentMethodSelectRef.current?.focus();
                           }
                         }}
                         type="number"
@@ -2117,7 +2163,18 @@ export default function NewBooking() {
               </div>
 
               {/* Payment Method Option */}
-              <div className={styles.payMethodGroup}>
+              <div 
+                className={styles.payMethodGroup}
+                ref={paymentMethodSelectRef}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveBookingBtnRef.current?.focus();
+                  }
+                }}
+                style={{ outline: 'none' }}
+              >
                 <label className="form-label" style={{ marginBottom: 0 }}>Payment Method</label>
                 <div className={styles.payMethodOptions}>
                   <label className={styles.payRadioLabel}>
@@ -2163,20 +2220,36 @@ export default function NewBooking() {
               <div className={styles.actionGrid}>
                 <div className={styles.savePrintRow}>
                   <PermissionButton 
+                    ref={saveBookingBtnRef}
                     moduleKey="booking"
                     action="can_add"
                     id="saveBtn"
                     className={styles.saveInvoiceBtn}
                     onClick={handleSaveBooking}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSaveBooking();
+                        setTimeout(() => printReceiptBtnRef.current?.focus(), 100);
+                      }
+                    }}
                     type="button"
                   >
                     <Save size={18} />
                     <span><u>S</u>ave Booking</span>
                   </PermissionButton>
                   <button 
+                    ref={printReceiptBtnRef}
                     id="printBtn"
                     className={styles.printInvoiceBtn}
                     onClick={handlePrintBooking}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handlePrintBooking();
+                        setTimeout(() => generateTaxInvBtnRef.current?.focus(), 100);
+                      }
+                    }}
                     type="button"
                   >
                     <Printer size={18} />
@@ -2184,8 +2257,16 @@ export default function NewBooking() {
                   </button>
                 </div>
                 <button
+                  ref={generateTaxInvBtnRef}
                   type="button"
                   onClick={handleGenerateFinalInvoice}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleGenerateFinalInvoice();
+                      setTimeout(() => sendWhatsappBtnRef.current?.focus(), 100);
+                    }
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -2206,7 +2287,17 @@ export default function NewBooking() {
                   <FileText size={16} />
                   <span>Generate Final Tax Invoice (INV)</span>
                 </button>
-                <button className={styles.whatsappBtn} type="button">
+                <button 
+                  ref={sendWhatsappBtnRef}
+                  className={styles.whatsappBtn} 
+                  type="button"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      deptSlipBtnRef.current?.focus();
+                    }
+                  }}
+                >
                   <Send size={16} />
                   <span>Send Invoice (WhatsApp)</span>
                 </button>
@@ -2217,15 +2308,35 @@ export default function NewBooking() {
           {/* Quick links */}
           <div className={styles.quickLinksGrid}>
             <div 
+              ref={deptSlipBtnRef}
+              tabIndex={0}
               className={styles.quickLinkCard}
               onClick={handlePrintDeptSlips}
-              style={{ cursor: 'pointer' }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handlePrintDeptSlips();
+                  searchPatientBtnRef.current?.focus();
+                }
+              }}
+              style={{ cursor: 'pointer', outline: 'none' }}
               title="Print Departmental Work Slips (rptbookingslip_dep transfer)"
             >
               <FileText size={24} style={{ color: 'var(--secondary)' }} />
               <span className={styles.quickLinkCardSpan}>Department Slip</span>
             </div>
-            <div className={styles.quickLinkCard}>
+            <div 
+              ref={searchPatientBtnRef}
+              tabIndex={0}
+              className={styles.quickLinkCard}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  codeRef.current?.focus();
+                }
+              }}
+              style={{ outline: 'none' }}
+            >
               <Users size={24} style={{ color: 'var(--secondary)' }} />
               <span className={styles.quickLinkCardSpan}>Search Patient</span>
             </div>
