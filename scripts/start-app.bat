@@ -28,18 +28,10 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
     for /f "tokens=1" %%b in ("%%a") do set "LOCAL_IP=%%b"
 )
 
-echo [1/2] Launching Laravel API Backend (Port 8000)...
-start /min "Santoshpur_Backend_8000" /d "%ROOT_DIR%backend" cmd /k "color 0B && echo Starting Laravel Backend... && php artisan serve --host=0.0.0.0 --port=8000"
+:: Launch Backend & Frontend in 100% hidden background (zero CMD windows)
+wscript.exe "%~dp0start-hidden.vbs" "%ROOT_DIR%"
 
-echo [2/2] Launching Next.js Frontend (Port 3000)...
-start /min "Santoshpur_Frontend_3000" /d "%ROOT_DIR%frontend" cmd /k "color 0A && echo Starting Next.js Frontend... && npm run dev"
-
-echo.
-echo ======================================================================
-echo  [DONE] Application services launched in taskbar!
-echo  Opening browser at: http://%LOCAL_IP%:3000
-echo ======================================================================
-echo.
+:: Open browser on IP address and exit launcher window immediately
 ping 127.0.0.1 -n 3 >nul
 start http://%LOCAL_IP%:3000
 exit /b 0
