@@ -1,4 +1,4 @@
-import { generateReportPin } from './numberToWords';
+
 
 function getSpecimenGuidance(testName = '') {
   const name = testName.toUpperCase();
@@ -94,7 +94,7 @@ export function generateA5DepartmentSlipsHTML(data) {
             </td>
             <td class="voucher-title-box">
               <div class="voucher-title" style="color: ${theme.mainColor}; background: ${theme.bgLight}; border-color: ${theme.borderColor};">
-                ${deptName} DEPARTMENTWISE [SLIP]
+                ${deptName} DEPARTMENT [SLIP]
               </div>
               <div style="font-size: 9px; color: #64748b; margin-top: 4px; font-weight: 700;">Page ${pageIdx + 1} of ${totalPages}</div>
             </td>
@@ -163,11 +163,11 @@ export function generateA5DepartmentSlipsHTML(data) {
         <!-- Lab Technician Notes & Signatures -->
         <div style="margin-top: 14px; display: flex; justify-content: space-between; align-items: flex-end; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
           <div>
-            <div style="font-size: 10px; font-weight: 800; color: #334155; text-transform: uppercase;">
-              🔒 REPORT ACCESS PIN: <span style="color: #070a61; background: #fef3c7; padding: 2px 6px; border-radius: 3px; border: 1px solid #f59e0b;">${reportPin}</span>
+            <div style="font-size: 10px; font-weight: 700; color: #334155; text-transform: uppercase;">
+              DEPARTMENT TRANSFER SLIP
             </div>
-            <div style="font-size: 9px; color: #64748b; margin-top: 4px;">
-              * Department Transfer Slip for Lab Technician processing.
+            <div style="font-size: 9px; color: #64748b; margin-top: 2px;">
+              * Internal slip for Lab Technician & Department processing.
             </div>
           </div>
 
