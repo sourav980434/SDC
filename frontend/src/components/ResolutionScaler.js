@@ -16,7 +16,7 @@ export default function ResolutionScaler({ children }) {
       // Calculate scale ratio relative to 1920px reference resolution
       let ratio = currentWidth / targetWidth;
       
-      // Clamp ratio between 0.55 (very small mobile/tablet) and 1.25 (2K+ monitors)
+      // Clamp ratio between 0.55 and 1.25
       if (ratio < 0.55) ratio = 0.55;
       if (ratio > 1.25) ratio = 1.25;
 
@@ -32,13 +32,19 @@ export default function ResolutionScaler({ children }) {
     return <>{children}</>;
   }
 
+  // Calculate inverse height to fill browser viewport cleanly when zoomed
+  const heightPercent = 100 / scale;
+
   return (
     <div
       style={{
         width: '100%',
-        minHeight: '100vh',
-        overflowX: 'hidden',
+        minHeight: `${heightPercent}vh`,
+        height: `${heightPercent}vh`,
         zoom: scale, // Modern CSS Zoom scaling for 1920x1080 layout baseline
+        backgroundColor: 'var(--background)',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {children}
