@@ -55,8 +55,6 @@ export function generateA5DepartmentSlipsHTML(data) {
     printedBy = 'Admin',
   } = data;
 
-  const reportPin = generateReportPin(bookingNo);
-
   // Group tests by department
   const deptGroups = {};
   selectedTests.forEach((t) => {
