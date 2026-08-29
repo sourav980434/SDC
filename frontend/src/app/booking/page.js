@@ -26,6 +26,7 @@ import { useActionPermission } from '@/hooks/useActionPermission';
 import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
 import { generateA5BookingReceiptHTML } from '@/lib/bookingReceiptTemplate';
+import { generateA5BillReceiptHTML } from '@/lib/billReceiptTemplate';
 
 export default function NewBooking() {
   const { shortcuts, parseKeyEvent } = useHotkeys();
@@ -1199,6 +1200,55 @@ export default function NewBooking() {
       advanceReceived: calculatedPaid,
       balanceDue: calcDue,
       paymentMethod,
+      printedBy: activeUserSession?.user_name || 'Admin',
+    });
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const handlePrintFinalTaxInvoice = () => {
+    if (!generatedInvoiceData) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow pop-ups to print the final tax invoice.');
+      return;
+    }
+
+    const currentInvPaid = generatedInvoiceData.paidAmount || 0;
+    const currentInvDue = generatedInvoiceData.dueAmount || 0;
+    const latestPayment = generatedInvoiceData.latestPaymentAmount || 0;
+    const initialAdvance = Math.max(0, currentInvPaid - latestPayment);
+
+    const htmlContent = generateA5BillReceiptHTML({
+      invoiceNo: generatedInvoiceData.invoiceNo || 'INV/26-27/00001',
+      invoiceDate: generatedInvoiceData.date_formatted || (currentDate && currentTime ? `${currentDate} ${currentTime}` : new Date().toLocaleString('en-GB')),
+      bookingNo: generatedInvoiceData.bookingNo || savedBookingNo || bookingNo,
+      patientCode: generatedInvoiceData.patientCode || patientCode,
+      prefix: generatedInvoiceData.prefix || prefix,
+      patientName: generatedInvoiceData.patientName || patientName,
+      age: generatedInvoiceData.age || age,
+      ageUnit: ageUnit || 'Yrs',
+      sex: generatedInvoiceData.sex || sex,
+      patientType: selectedCategory || 'GENERAL',
+      phone: generatedInvoiceData.phone || phone,
+      address: generatedInvoiceData.address || address,
+      referredBy: referredBy || 'Dr. SELF',
+      selectedTests: (generatedInvoiceData.items || []).map(item => ({
+        code: item.code,
+        name: item.name,
+        price: item.price,
+        delivery_date: item.delivery_date || 'Same Day'
+      })),
+      totalAmount: generatedInvoiceData.netAmount || grandTotal,
+      discountAmount: generatedInvoiceData.discountAmount || 0,
+      netAmount: generatedInvoiceData.netAmount || grandTotal,
+      advanceReceived: initialAdvance,
+      currentPayment: latestPayment,
+      totalPaid: currentInvPaid,
+      balanceDue: currentInvDue,
+      paymentMethod: generatedInvoiceData.paymentMethod || paymentMethod || 'Cash',
       printedBy: activeUserSession?.user_name || 'Admin',
     });
 
@@ -2884,7 +2934,7 @@ export default function NewBooking() {
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={handlePrintFinalTaxInvoice}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
