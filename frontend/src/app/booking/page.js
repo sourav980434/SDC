@@ -25,6 +25,8 @@ import { useActionPermission } from '@/hooks/useActionPermission';
 
 import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
+import { generateA5BookingReceiptHTML } from '@/lib/bookingReceiptTemplate';
+
 export default function NewBooking() {
   const { shortcuts, parseKeyEvent } = useHotkeys();
 
@@ -1166,7 +1168,40 @@ export default function NewBooking() {
       searchRef.current?.focus();
       return;
     }
-    window.print();
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow pop-ups to print the booking receipt.');
+      return;
+    }
+
+    const currentTotalPaid = parseFloat(receivedAmount || 0);
+
+    const htmlContent = generateA5BookingReceiptHTML({
+      bookingNo: savedBookingNo || bookingNo,
+      bookingDate: currentDate && currentTime ? `${currentDate} ${currentTime}` : new Date().toLocaleString('en-GB'),
+      patientCode,
+      prefix,
+      patientName,
+      age,
+      ageUnit,
+      sex,
+      patientType: selectedCategory || 'GENERAL',
+      phone,
+      address,
+      referredBy,
+      selectedTests,
+      totalAmount: subtotal,
+      discountAmount: discountAmount,
+      grandTotal: grandTotal,
+      advanceReceived: currentTotalPaid,
+      balanceDue: balanceDue,
+      paymentMethod,
+      printedBy: activeUserSession?.user_name || 'Admin',
+    });
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   const handleClearForm = () => {
