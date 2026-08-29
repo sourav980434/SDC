@@ -1014,7 +1014,7 @@ export default function NewBooking() {
 
     const htmlContent = generateA5BookingReceiptHTML({
       bookingNo: savedBookingNo || bookingNo,
-      bookingDate: currentDate && currentTime ? `${currentDate} ${currentTime}` : new Date().toLocaleString('en-GB'),
+      bookingDate: savedBillInfo?.date || new Date().toLocaleString('en-GB'),
       patientCode,
       prefix,
       patientName,

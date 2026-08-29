@@ -1305,12 +1305,16 @@ Route::post('/api/booking/save', function (Request $request) {
                 ]);
             }
 
+            $existingHdr = DB::table('tbl_web_booking_hdr')->where('id', $hdrId)->first();
+            $createdFormatted = $existingHdr && $existingHdr->created_at ? (new DateTime($existingHdr->created_at))->format('d-M-Y h:i A') : (new DateTime())->format('d-M-Y h:i A');
+
             return response()->json([
                 'message' => 'Web booking updated successfully',
                 'bookingNo' => $fullDisplayNo,
                 'serial' => $paddedSerial,
                 'hdr_id' => $hdrId,
-                'is_updated' => true
+                'is_updated' => true,
+                'created_at_formatted' => $createdFormatted
             ]);
 
         } else {
@@ -1408,12 +1412,14 @@ Route::post('/api/booking/save', function (Request $request) {
                 ]);
             }
             
+            $createdFormatted = (new DateTime())->format('d-M-Y h:i A');
             return response()->json([
                 'message' => 'Web booking saved successfully',
                 'bookingNo' => $fullDisplayNo,
                 'serial' => $paddedSerial,
                 'hdr_id' => $hdrId,
-                'is_updated' => false
+                'is_updated' => false,
+                'created_at_formatted' => $createdFormatted
             ]);
         }
     });
