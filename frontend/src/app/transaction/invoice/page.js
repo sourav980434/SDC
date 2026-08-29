@@ -69,14 +69,18 @@ export default function InvoicePage() {
           const invKey = selectedInv.invoiceNo || selectedInv.invoice_no;
           fetch(`${API_BASE}/api/invoice/by-no/${encodeURIComponent(invKey)}`)
             .then(r => r.json())
-            .then(updated => setSelectedInv(updated));
+            .then(updated => {
+              setSelectedInv(updated);
+              handlePrintSelectedTaxInvoice(updated);
+            });
         }
       })
       .catch(err => alert("Error updating invoice balance"));
   };
 
-  const handlePrintSelectedTaxInvoice = () => {
-    if (!selectedInv) return;
+  const handlePrintSelectedTaxInvoice = (targetInv = null) => {
+    const invData = targetInv || selectedInv;
+    if (!invData) return;
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -84,40 +88,40 @@ export default function InvoicePage() {
       return;
     }
 
-    const netAmt = parseFloat(selectedInv.netAmount ?? selectedInv.net_amount ?? 0);
-    const paidAmt = parseFloat(selectedInv.paidAmount ?? selectedInv.paid_amount ?? 0);
-    const dueAmt = parseFloat(selectedInv.dueAmount ?? selectedInv.due_amount ?? 0);
-    const latestPmt = selectedInv.payments && selectedInv.payments.length > 0 ? selectedInv.payments[selectedInv.payments.length - 1].amount : 0;
+    const netAmt = parseFloat(invData.netAmount ?? invData.net_amount ?? 0);
+    const paidAmt = parseFloat(invData.paidAmount ?? invData.paid_amount ?? 0);
+    const dueAmt = parseFloat(invData.dueAmount ?? invData.due_amount ?? 0);
+    const latestPmt = invData.payments && invData.payments.length > 0 ? invData.payments[invData.payments.length - 1].amount : 0;
     const initialAdv = Math.max(0, paidAmt - latestPmt);
 
     const htmlContent = generateA5BillReceiptHTML({
-      invoiceNo: selectedInv.invoiceNo || selectedInv.invoice_no || 'INV/26-27/00001',
-      invoiceDate: selectedInv.date_formatted || selectedInv.invoiceDate || selectedInv.invoice_date || new Date().toLocaleString('en-GB'),
-      bookingNo: selectedInv.bookingNo || selectedInv.booking_no || '',
-      patientCode: selectedInv.patientCode || selectedInv.patient_code || '',
-      prefix: selectedInv.prefix || 'Mr.',
-      patientName: selectedInv.patientName || selectedInv.patient_name || 'Guest',
-      age: selectedInv.age || selectedInv.age_year || '',
+      invoiceNo: invData.invoiceNo || invData.invoice_no || 'INV/26-27/00001',
+      invoiceDate: invData.date_formatted || invData.invoiceDate || invData.invoice_date || new Date().toLocaleString('en-GB'),
+      bookingNo: invData.bookingNo || invData.booking_no || '',
+      patientCode: invData.patientCode || invData.patient_code || '',
+      prefix: invData.prefix || 'Mr.',
+      patientName: invData.patientName || invData.patient_name || 'Guest',
+      age: invData.age || invData.age_year || '',
       ageUnit: 'Yrs',
-      sex: selectedInv.sex || 'Male',
-      patientType: selectedInv.patientType || 'GENERAL',
-      phone: selectedInv.phone || selectedInv.mobile_no || '',
-      address: selectedInv.address || '',
-      referredBy: selectedInv.referredBy || selectedInv.doctorName || selectedInv.doctor_name || 'Dr. SELF',
-      selectedTests: (selectedInv.items || []).map(item => ({
+      sex: invData.sex || 'Male',
+      patientType: invData.patientType || 'GENERAL',
+      phone: invData.phone || invData.mobile_no || '',
+      address: invData.address || '',
+      referredBy: invData.referredBy || invData.doctorName || invData.doctor_name || 'Dr. SELF',
+      selectedTests: (invData.items || []).map(item => ({
         code: item.code || item.test_code || '',
         name: item.name || item.testName || item.test_name || 'Diagnostic Test',
         price: item.price ?? item.amount ?? 0,
         delivery_date: item.delivery_date || 'Same Day'
       })),
       totalAmount: netAmt,
-      discountAmount: parseFloat(selectedInv.discountValue || 0),
+      discountAmount: parseFloat(invData.discountValue || 0),
       netAmount: netAmt,
       advanceReceived: initialAdv,
       currentPayment: latestPmt,
       totalPaid: paidAmt,
       balanceDue: dueAmt,
-      paymentMethod: selectedInv.paymentMethod || 'Cash',
+      paymentMethod: invData.paymentMethod || 'Cash',
       printedBy: 'Admin',
     });
 
