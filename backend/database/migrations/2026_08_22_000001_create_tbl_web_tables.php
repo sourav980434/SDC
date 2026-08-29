@@ -34,6 +34,8 @@ return new class extends Migration
                 $table->decimal('subtotal_amount', 18, 2)->default(0.00);
                 $table->string('discount_type', 10)->default('percent');
                 $table->decimal('discount_value', 18, 2)->default(0.00);
+                $table->decimal('collection_charge', 18, 2)->default(0.00);
+                $table->decimal('procedure_charge', 18, 2)->default(0.00);
                 $table->decimal('net_amount', 18, 2)->default(0.00);
                 $table->decimal('paid_amount', 18, 2)->default(0.00);
                 $table->decimal('due_amount', 18, 2)->default(0.00);
@@ -41,6 +43,11 @@ return new class extends Migration
                 $table->string('booking_status', 20)->default('ACTIVE');
                 $table->dateTime('created_at')->useCurrent();
                 $table->string('created_by', 50)->default('Admin');
+            });
+        } else {
+            Schema::table('tbl_web_booking_hdr', function (Blueprint $table) {
+                if (!Schema::hasColumn('tbl_web_booking_hdr', 'collection_charge')) $table->decimal('collection_charge', 18, 2)->default(0.00);
+                if (!Schema::hasColumn('tbl_web_booking_hdr', 'procedure_charge')) $table->decimal('procedure_charge', 18, 2)->default(0.00);
             });
         }
 
@@ -109,12 +116,19 @@ return new class extends Migration
                 $table->string('patient_name', 100);
                 $table->decimal('subtotal_amount', 18, 2)->default(0.00);
                 $table->decimal('discount_value', 18, 2)->default(0.00);
+                $table->decimal('collection_charge', 18, 2)->default(0.00);
+                $table->decimal('procedure_charge', 18, 2)->default(0.00);
                 $table->decimal('net_amount', 18, 2)->default(0.00);
                 $table->decimal('paid_amount', 18, 2)->default(0.00);
                 $table->decimal('due_amount', 18, 2)->default(0.00);
                 $table->string('invoice_status', 20)->default('FULLY PAID');
                 $table->dateTime('created_at')->useCurrent();
                 $table->string('created_by', 50)->default('Admin');
+            });
+        } else {
+            Schema::table('tbl_web_invoice_hdr', function (Blueprint $table) {
+                if (!Schema::hasColumn('tbl_web_invoice_hdr', 'collection_charge')) $table->decimal('collection_charge', 18, 2)->default(0.00);
+                if (!Schema::hasColumn('tbl_web_invoice_hdr', 'procedure_charge')) $table->decimal('procedure_charge', 18, 2)->default(0.00);
             });
         }
     }

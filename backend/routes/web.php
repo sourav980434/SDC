@@ -1178,7 +1178,10 @@ Route::post('/api/booking/save', function (Request $request) {
         }
         if ($discount > $subtotal) $discount = $subtotal;
         
-        $netAmount = $subtotal - $discount;
+        $collectionCharge = floatval($data['collectionCharge'] ?? $data['collection_charge'] ?? 0);
+        $procedureCharge = floatval($data['procedureCharge'] ?? $data['procedure_charge'] ?? 0);
+        
+        $netAmount = max(0, ($subtotal - $discount) + $collectionCharge + $procedureCharge);
         $paidAmount = floatval($data['receivedAmount'] ?? 0);
         $dueAmount = $netAmount - $paidAmount;
         if ($dueAmount < 0) $dueAmount = 0;
@@ -1237,6 +1240,8 @@ Route::post('/api/booking/save', function (Request $request) {
                 'discount_type' => $data['discountType'] ?? 'percent',
                 'discount_value' => $discVal,
                 'discount_amount' => $discount,
+                'collection_charge' => $collectionCharge,
+                'procedure_charge' => $procedureCharge,
                 'net_amount' => $netAmount,
                 'paid_amount' => $totalPaidAmount,
                 'due_amount' => $dueAmount,
@@ -1356,6 +1361,8 @@ Route::post('/api/booking/save', function (Request $request) {
                 'discount_type' => $data['discountType'] ?? 'percent',
                 'discount_value' => $discVal,
                 'discount_amount' => $discount,
+                'collection_charge' => $collectionCharge,
+                'procedure_charge' => $procedureCharge,
                 'net_amount' => $netAmount,
                 'paid_amount' => $paidAmount,
                 'due_amount' => $dueAmount,
@@ -1505,6 +1512,8 @@ Route::get('/api/booking/by-no/{serial}', function ($serial) {
         'subtotal' => floatval($webHdr->subtotal_amount ?? 0),
         'discountValue' => floatval($webHdr->discount_value ?? 0),
         'discountType' => trim($webHdr->discount_type ?? 'percent'),
+        'collectionCharge' => floatval($webHdr->collection_charge ?? 0),
+        'procedureCharge' => floatval($webHdr->procedure_charge ?? 0),
         'netAmount' => floatval($webHdr->net_amount ?? 0),
         'advAmount' => floatval($webHdr->paid_amount ?? 0),
         'paymentMethod' => trim($webHdr->payment_method ?? 'Cash'),
@@ -1721,6 +1730,8 @@ Route::post('/api/invoice/generate', function (Request $request) {
         DB::table('tbl_web_invoice_hdr')->where('id', $existingInv->id)->update([
             'subtotal_amount' => $hdr->subtotal_amount,
             'discount_value' => $hdr->discount_value,
+            'collection_charge' => floatval($hdr->collection_charge ?? 0),
+            'procedure_charge' => floatval($hdr->procedure_charge ?? 0),
             'net_amount' => $netAmt,
             'paid_amount' => $paidAmt,
             'due_amount' => $dueAmt,
@@ -1753,6 +1764,8 @@ Route::post('/api/invoice/generate', function (Request $request) {
         'patient_name' => $hdr->patient_name,
         'subtotal_amount' => $hdr->subtotal_amount,
         'discount_value' => $hdr->discount_value,
+        'collection_charge' => floatval($hdr->collection_charge ?? 0),
+        'procedure_charge' => floatval($hdr->procedure_charge ?? 0),
         'net_amount' => $netAmt,
         'paid_amount' => $paidAmt,
         'due_amount' => $dueAmt,
@@ -1865,6 +1878,8 @@ if (!function_exists('getInvoiceDetailsResponse')) {
             'referredBy' => !empty($inv->bk_doctor_name) ? $inv->bk_doctor_name : 'Dr. SELF',
             'subtotal' => floatval($inv->subtotal_amount),
             'discountValue' => floatval($inv->discount_value),
+            'collectionCharge' => floatval($inv->collection_charge ?? 0),
+            'procedureCharge' => floatval($inv->procedure_charge ?? 0),
             'netAmount' => floatval($inv->net_amount),
             'paidAmount' => floatval($inv->paid_amount),
             'dueAmount' => floatval($inv->due_amount),

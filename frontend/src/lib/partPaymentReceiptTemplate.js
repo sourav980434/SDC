@@ -16,6 +16,8 @@ export function generateA5PartPaymentReceiptHTML(data) {
     address = '',
     referredBy = 'Dr. SELF',
     selectedTests = [],
+    collectionCharge = 0,
+    procedureCharge = 0,
     grandTotal = 0,
     previousPaid = 0,
     currentPayment = 0,
@@ -497,9 +499,29 @@ export function generateA5PartPaymentReceiptHTML(data) {
         <td class="summary-right">
           <table class="calc-table">
             <tr>
-              <td class="calc-label">Total Test Charge:</td>
+              <td class="calc-label">Net Payable Charge:</td>
               <td class="calc-val">₹ ${parseFloat(grandTotal).toFixed(2)}</td>
             </tr>
+            ${
+              collectionCharge > 0
+                ? `
+            <tr>
+              <td class="calc-label">Collection Charge:</td>
+              <td class="calc-val">₹ ${parseFloat(collectionCharge).toFixed(2)}</td>
+            </tr>
+            `
+                : ''
+            }
+            ${
+              procedureCharge > 0
+                ? `
+            <tr>
+              <td class="calc-label">Dr. Procedure Charge:</td>
+              <td class="calc-val">₹ ${parseFloat(procedureCharge).toFixed(2)}</td>
+            </tr>
+            `
+                : ''
+            }
             <tr>
               <td class="calc-label">Previous Paid:</td>
               <td class="calc-val" style="color: #475569;">₹ ${parseFloat(previousPaid).toFixed(2)}</td>

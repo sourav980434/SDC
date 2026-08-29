@@ -89,6 +89,8 @@ export default function NewBooking() {
   const [selectedTests, setSelectedTests] = useState([]);
   const [discountType, setDiscountType] = useState('percent'); // 'percent' or 'amount'
   const [discountValue, setDiscountValue] = useState('');
+  const [collectionCharge, setCollectionCharge] = useState('');
+  const [procedureCharge, setProcedureCharge] = useState('');
   const [paymentMode, setPaymentMode] = useState('full'); // 'full' or 'part'
   const [receivedAmount, setReceivedAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
@@ -738,7 +740,9 @@ export default function NewBooking() {
     discount = subtotal;
   }
   
-  const grandTotal = subtotal - discount;
+  const colChargeVal = parseFloat(collectionCharge) || 0;
+  const procChargeVal = parseFloat(procedureCharge) || 0;
+  const grandTotal = Math.max(0, (subtotal - discount) + colChargeVal + procChargeVal);
   const totalPaid = paymentsList.reduce((sum, p) => sum + p.amount, 0);
   const balanceDue = grandTotal - totalPaid;
 
@@ -839,6 +843,8 @@ export default function NewBooking() {
             }));
             setSelectedTests(loadedTests);
             setDiscountValue(data.discountValue || '');
+            setCollectionCharge(data.collectionCharge ? String(data.collectionCharge) : '');
+            setProcedureCharge(data.procedureCharge ? String(data.procedureCharge) : '');
             setReceivedAmount(''); // Keep empty for new payment entry
             setPaymentMethod(data.paymentMethod || 'Cash');
             setBookingNo(data.bookingNo);
@@ -966,6 +972,8 @@ export default function NewBooking() {
       selectedTests,
       discountType,
       discountValue: parseFloat(discountValue) || 0,
+      collectionCharge: parseFloat(collectionCharge) || 0,
+      procedureCharge: parseFloat(procedureCharge) || 0,
       receivedAmount: parseFloat(receivedAmount) || 0,
       paymentMethod
     };
@@ -1028,6 +1036,8 @@ export default function NewBooking() {
       selectedTests,
       totalAmount: subtotal,
       discountAmount: discount,
+      collectionCharge: parseFloat(collectionCharge) || 0,
+      procedureCharge: parseFloat(procedureCharge) || 0,
       grandTotal: grandTotal,
       advanceReceived: calculatedPaid,
       balanceDue: calcDue,
@@ -1073,8 +1083,10 @@ export default function NewBooking() {
         price: item.price,
         delivery_date: item.delivery_date || 'Same Day'
       })),
-      totalAmount: generatedInvoiceData.netAmount || grandTotal,
-      discountAmount: generatedInvoiceData.discountAmount || 0,
+      totalAmount: subtotal,
+      discountAmount: generatedInvoiceData.discountAmount || discount || 0,
+      collectionCharge: generatedInvoiceData.collectionCharge ?? parseFloat(collectionCharge) ?? 0,
+      procedureCharge: generatedInvoiceData.procedureCharge ?? parseFloat(procedureCharge) ?? 0,
       netAmount: generatedInvoiceData.netAmount || grandTotal,
       advanceReceived: initialAdvance,
       currentPayment: latestPayment,
@@ -1120,6 +1132,8 @@ export default function NewBooking() {
       address,
       referredBy: referredBy || 'Dr. SELF',
       selectedTests,
+      collectionCharge: parseFloat(collectionCharge) || 0,
+      procedureCharge: parseFloat(procedureCharge) || 0,
       grandTotal,
       previousPaid: prevPaidAmt,
       currentPayment: currentPayAmt,
@@ -1876,6 +1890,70 @@ export default function NewBooking() {
                   <span className={styles.billDiscount}>-₹ {discount.toFixed(2)}</span>
                 </div>
               )}
+
+              {/* Collection Charge Input */}
+              <div className={styles.billRow} style={{ gap: '8px', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', color: 'var(--on-background)', fontWeight: '600' }}>Collection Charge</span>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--outline)' }}>₹</span>
+                  <input
+                    type="number"
+                    value={collectionCharge}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (parseFloat(val) >= 0 || val === '') {
+                        setCollectionCharge(val);
+                      }
+                    }}
+                    placeholder="0"
+                    style={{
+                      width: '75px',
+                      padding: '4px 8px',
+                      border: '1px solid var(--outline-variant)',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'var(--surface-container-low)',
+                      color: 'var(--on-background)',
+                      textAlign: 'right',
+                      outline: 'none',
+                      fontSize: '13.5px',
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              {/* Dr. Procedure Charge Input */}
+              <div className={styles.billRow} style={{ gap: '8px', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', color: 'var(--on-background)', fontWeight: '600' }}>Dr. Procedure Charge</span>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--outline)' }}>₹</span>
+                  <input
+                    type="number"
+                    value={procedureCharge}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (parseFloat(val) >= 0 || val === '') {
+                        setProcedureCharge(val);
+                      }
+                    }}
+                    placeholder="0"
+                    style={{
+                      width: '75px',
+                      padding: '4px 8px',
+                      border: '1px solid var(--outline-variant)',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'var(--surface-container-low)',
+                      color: 'var(--on-background)',
+                      textAlign: 'right',
+                      outline: 'none',
+                      fontSize: '13.5px',
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                    min="0"
+                  />
+                </div>
+              </div>
 
               <div className={styles.billTotalDivider}>
                 <div className={styles.grandTotalRow}>

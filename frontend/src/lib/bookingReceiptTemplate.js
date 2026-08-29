@@ -17,6 +17,8 @@ export function generateA5BookingReceiptHTML(data) {
     selectedTests = [],
     totalAmount = 0,
     discountAmount = 0,
+    collectionCharge = 0,
+    procedureCharge = 0,
     grandTotal = 0,
     advanceReceived = 0,
     balanceDue = 0,
@@ -539,6 +541,26 @@ export function generateA5BookingReceiptHTML(data) {
               <tr>
                 <td class="calc-label" style="color: #b58900;">Discount (-):</td>
                 <td class="calc-val" style="color: #b58900;">₹ ${parseFloat(discountAmount).toFixed(2)}</td>
+              </tr>
+            `
+                : ''
+            }
+            ${
+              collectionCharge > 0
+                ? `
+              <tr>
+                <td class="calc-label" style="color: #475569;">Collection Charge:</td>
+                <td class="calc-val" style="color: #475569;">₹ ${parseFloat(collectionCharge).toFixed(2)}</td>
+              </tr>
+            `
+                : ''
+            }
+            ${
+              procedureCharge > 0
+                ? `
+              <tr>
+                <td class="calc-label" style="color: #475569;">Dr. Procedure Charge:</td>
+                <td class="calc-val" style="color: #475569;">₹ ${parseFloat(procedureCharge).toFixed(2)}</td>
               </tr>
             `
                 : ''

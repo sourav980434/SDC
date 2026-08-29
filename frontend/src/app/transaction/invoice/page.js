@@ -183,8 +183,10 @@ export default function InvoicePage() {
             price: parseFloat(item.price ?? item.amount ?? item.Rate ?? 0),
             delivery_date: item.delivery_date || 'Same Day'
           })),
-          totalAmount: netAmt,
+          totalAmount: parseFloat(invData.subtotal || invData.subtotal_amount || rawInv.subtotal_amount || netAmt),
           discountAmount: parseFloat(invData.discountValue || invData.discount_value || 0),
+          collectionCharge: parseFloat(invData.collectionCharge || invData.collection_charge || rawInv.collection_charge || 0),
+          procedureCharge: parseFloat(invData.procedureCharge || invData.procedure_charge || rawInv.procedure_charge || 0),
           netAmount: netAmt,
           advanceReceived: initialAdv,
           currentPayment: latestPmt,

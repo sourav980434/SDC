@@ -18,6 +18,8 @@ export function generateA5BillReceiptHTML(data) {
     selectedTests = [],
     totalAmount = 0,
     discountAmount = 0,
+    collectionCharge = 0,
+    procedureCharge = 0,
     netAmount = 0,
     advanceReceived = 0,
     currentPayment = 0,
@@ -514,11 +516,11 @@ export function generateA5BillReceiptHTML(data) {
             </tr>
             <tr>
               <td class="calc-label">Collection Charge:</td>
-              <td class="calc-val">₹ 0.00</td>
+              <td class="calc-val">₹ ${parseFloat(collectionCharge || 0).toFixed(2)}</td>
             </tr>
             <tr>
               <td class="calc-label">Dr. Procedure Charge:</td>
-              <td class="calc-val">₹ 0.00</td>
+              <td class="calc-val">₹ ${parseFloat(procedureCharge || 0).toFixed(2)}</td>
             </tr>
             ${
               discountAmount > 0
