@@ -13,7 +13,20 @@ backend/storage/*.key
 .env
 .env*.local
 
-# OS & Temp / Large Media
+# OS & Temp files
 .DS_Store
 Thumbs.db
+~$*
+~WRL*
+*.tmp
+
+# Images & Media (screenshots, videos)
+*.png
+*.jpg
+*.jpeg
+*.gif
 *.mp4
+*.avi
+
+# Report Templates (Word/Excel) - kept on disk only
+REPORT MASTER/
