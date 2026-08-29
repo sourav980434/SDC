@@ -14,36 +14,35 @@ for /f "tokens=*" %%v in ('C:\xampp\php\php.exe -r "echo PHP_MAJOR_VERSION.'.'.P
 echo [INFO] Detected XAMPP PHP Version: %PHP_VER%
 
 echo.
-echo [2/3] Updating C:\xampp\php\php.ini...
-findstr /c:"extension=pdo_sqlsrv" "C:\xampp\php\php.ini" >nul 2>&1
-if %errorlevel% equ 0 goto :INI_ALREADY_UPDATED
+echo [2/3] Checking php.ini configuration...
+findstr /c:"php_pdo_sqlsrv" "C:\xampp\php\php.ini" >nul 2>&1
+if %errorlevel% equ 0 goto :CHECK_DRIVER
 
 echo.>> "C:\xampp\php\php.ini"
-echo extension=pdo_sqlsrv>> "C:\xampp\php\php.ini"
-echo extension=sqlsrv>> "C:\xampp\php\php.ini"
-echo [SUCCESS] Enabled extension=pdo_sqlsrv and extension=sqlsrv in php.ini!
-goto :CHECK_DRIVER
-
-:INI_ALREADY_UPDATED
-echo [INFO] php.ini already contains sqlsrv extension directives.
+echo extension=php_pdo_sqlsrv_%PHP_VER%_ts_x64.dll>> "C:\xampp\php\php.ini"
+echo extension=php_sqlsrv_%PHP_VER%_ts_x64.dll>> "C:\xampp\php\php.ini"
+echo extension=php_pdo_sqlsrv.dll>> "C:\xampp\php\php.ini"
+echo extension=php_sqlsrv.dll>> "C:\xampp\php\php.ini"
+echo [SUCCESS] Added extension directives to C:\xampp\php\php.ini
 
 :CHECK_DRIVER
 echo.
-echo [3/3] Checking SQL Server Driver in PHP...
-C:\xampp\php\php.exe -m | findstr /i "sqlsrv" >nul 2>&1
+echo [3/3] Testing SQL Server Driver loading in PHP...
+C:\xampp\php\php.exe -r "exit(extension_loaded('pdo_sqlsrv') ? 0 : 1);" >nul 2>&1
 if %errorlevel% equ 0 goto :DRIVER_ACTIVE
 
 echo.
 echo ======================================================================
-echo  [ACTION REQUIRED]
-echo  The sqlsrv DLL files are missing from C:\xampp\php\ext\
+echo  [ACTION REQUIRED] Driver DLL files missing from C:\xampp\php\ext\
 echo.
+echo  Your XAMPP PHP version is: %PHP_VER% (64-bit Thread Safe)
+echo.
+echo  Please follow these 2 quick steps:
 echo  1. Download Microsoft Drivers for PHP for SQL Server:
 echo     https://learn.microsoft.com/en-us/sql/connect/php/download-drivers-php-sql-server
-echo  2. Copy php_pdo_sqlsrv_%PHP_VER%_ts_x64.dll and php_sqlsrv_%PHP_VER%_ts_x64.dll into:
-echo     C:\xampp\php\ext\
-echo  3. Download Microsoft ODBC Driver 17 for SQL Server:
-echo     https://go.microsoft.com/fwlink/?linkid=2249004
+echo  2. Unzip and copy these 2 files into C:\xampp\php\ext\
+echo     - php_pdo_sqlsrv_82_ts_x64.dll (or rename to php_pdo_sqlsrv.dll)
+echo     - php_sqlsrv_82_ts_x64.dll     (or rename to php_sqlsrv.dll)
 echo ======================================================================
 echo.
 pause
