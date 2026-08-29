@@ -164,13 +164,13 @@ export default function UserManagementPage() {
 
           // Refresh active session if editing self
           try {
-            const currentSession = localStorage.getItem('sdcp_user_session');
+            const currentSession = sessionStorage.getItem('sdcp_user_session');
             if (currentSession && editingUser) {
               const parsed = JSON.parse(currentSession);
               if (parsed.user_code === editingUser.user_code) {
                 parsed.modules = selectedModules;
                 parsed.departments = selectedDepts;
-                localStorage.setItem('sdcp_user_session', JSON.stringify(parsed));
+                sessionStorage.setItem('sdcp_user_session', JSON.stringify(parsed));
               }
             }
           } catch (e) {}

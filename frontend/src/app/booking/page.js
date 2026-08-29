@@ -32,7 +32,7 @@ export default function NewBooking() {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('sdcp_user_session');
+      const stored = sessionStorage.getItem('sdcp_user_session');
       if (stored) {
         setActiveUserSession(JSON.parse(stored));
       }

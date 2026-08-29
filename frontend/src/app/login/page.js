@@ -6,8 +6,11 @@ import styles from './login.module.css';
 import { Activity, Lock, User, LogIn, AlertCircle, KeyRound } from 'lucide-react';
 
 import API_BASE from '@/lib/apiConfig';
+import { useAuth } from '@/context/AuthContext';
+
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,12 +37,11 @@ export default function LoginPage() {
         if (data.error) {
           setErrorMsg(data.error);
         } else if (data.user) {
-          // Save user session to localStorage
-          localStorage.setItem('sdcp_user_session', JSON.stringify(data.user));
-          // Redirect to dashboard
-          router.push('/dashboard');
+          // Save user session via AuthContext (sessionStorage) & redirect
+          login(data.user);
         }
       })
+
       .catch(err => {
         setLoading(false);
         setErrorMsg('Connection failed. Ensure backend server is running.');

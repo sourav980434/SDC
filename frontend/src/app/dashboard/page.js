@@ -34,7 +34,7 @@ export default function DailyDashboard() {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('sdcp_user_session');
+      const stored = sessionStorage.getItem('sdcp_user_session');
       if (stored) {
         setActiveUser(JSON.parse(stored));
       }

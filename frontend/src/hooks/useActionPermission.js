@@ -18,7 +18,7 @@ export function useActionPermission(moduleKey) {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('sdcp_user_session');
+      const stored = sessionStorage.getItem('sdcp_user_session');
       if (stored) {
         const user = JSON.parse(stored);
         

@@ -4,32 +4,23 @@ import { Search, Bell, Settings, Menu, LogOut, User } from 'lucide-react';
 import styles from '../app/layout.module.css';
 
 import { fetchLabSettings } from '../lib/labSettings';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Header({ toggleSidebar }) {
   const router = useRouter();
-  const [activeUser, setActiveUser] = useState(null);
+  const { user: activeUser, logout } = useAuth();
   const [labName, setLabName] = useState('Santoshpur Diagnostic Centre');
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('sdcp_user_session');
-      if (stored) {
-        setActiveUser(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error("Error reading user session:", e);
-    }
     fetchLabSettings().then(cfg => {
       if (cfg && cfg.lab_name) setLabName(cfg.lab_name);
     });
   }, []);
 
   const handleLogOff = () => {
-    try {
-      localStorage.removeItem('sdcp_user_session');
-    } catch (e) {}
-    router.push('/login');
+    logout();
   };
+
 
   return (
     <header className={styles.header}>

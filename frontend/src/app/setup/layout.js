@@ -1,30 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import Footer from '../../components/Footer';
 import styles from '../layout.module.css';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 
 export default function SetupLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeUser, setActiveUser] = useState(null);
-  const [loadingUser, setLoadingUser] = useState(true);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('sdcp_user_session');
-      if (stored) {
-        setActiveUser(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error("Error checking auth session:", e);
-    } finally {
-      setLoadingUser(false);
-    }
-  }, []);
+  const { user: activeUser, isLoaded } = useAuth();
+  const loadingUser = !isLoaded;
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);

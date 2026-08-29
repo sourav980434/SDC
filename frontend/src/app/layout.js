@@ -1,3 +1,4 @@
+import { AuthProvider } from "@/context/AuthContext";
 import { HotkeyProvider } from "@/context/HotkeyContext";
 import "./globals.css";
 
@@ -10,9 +11,11 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <HotkeyProvider>
-          {children}
-        </HotkeyProvider>
+        <AuthProvider>
+          <HotkeyProvider>
+            {children}
+          </HotkeyProvider>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useHotkeys } from '../context/HotkeyContext';
+import { useAuth } from '../context/AuthContext';
 import {
   Database,
   ReceiptText,
@@ -22,27 +23,21 @@ import styles from '../app/layout.module.css';
 export default function Sidebar({ isOpen }) {
   const pathname = usePathname();
   const { shortcuts } = useHotkeys();
+  const { user: activeUser, isLoaded } = useAuth();
 
-  const [activeUser, setActiveUser] = useState(null);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem('sdcp_user_session');
-      if (storedUser) {
-        setActiveUser(JSON.parse(storedUser));
-      }
       const storedCollapsed = localStorage.getItem('sdcp_sidebar_collapsed');
       if (storedCollapsed !== null) {
         setIsCollapsed(storedCollapsed === 'true');
       }
     } catch (e) {
       console.error("Error reading sidebar state:", e);
-    } finally {
-      setIsLoaded(true);
     }
   }, []);
+
 
   const toggleCollapse = () => {
     setIsCollapsed(prev => {
