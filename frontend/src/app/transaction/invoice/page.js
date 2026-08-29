@@ -110,8 +110,9 @@ export default function InvoicePage() {
       referredBy: invData.referredBy || invData.doctorName || invData.doctor_name || 'Dr. SELF',
       selectedTests: (invData.items || []).map(item => ({
         code: item.code || item.test_code || '',
-        name: item.name || item.testName || item.test_name || 'Diagnostic Test',
-        price: item.price ?? item.amount ?? 0,
+        name: item.name || item.testName || item.test_name || item.Descr || 'Diagnostic Test',
+        test_name: item.name || item.testName || item.test_name || item.Descr || 'Diagnostic Test',
+        price: item.price ?? item.amount ?? item.Rate ?? 0,
         delivery_date: item.delivery_date || 'Same Day'
       })),
       totalAmount: netAmt,

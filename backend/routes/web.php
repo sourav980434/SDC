@@ -1784,16 +1784,24 @@ Route::get('/api/invoice/list', function (Request $request) {
 });
 
 Route::get('/api/invoice/by-no/{invoiceNo}', function ($invoiceNo) {
-    $cleanNo = trim($invoiceNo);
-    $numNo = intval($cleanNo);
+    $cleanNo = trim(urldecode($invoiceNo));
+    
+    $parts = explode('/', $cleanNo);
+    $lastPart = end($parts);
+    $numNo = intval(preg_replace('/[^0-9]/', '', $lastPart));
     $paddedNo = str_pad($numNo, 5, '0', STR_PAD_LEFT);
 
-    $inv = DB::table('tbl_web_invoice_hdr as i')
+    $query = DB::table('tbl_web_invoice_hdr as i')
         ->join('tbl_web_booking_hdr as b', 'i.booking_id', '=', 'b.id')
-        ->where('i.invoice_no', $cleanNo)
-        ->orWhere('i.invoice_no', 'like', "%/$paddedNo%")
-        ->orWhere('i.serial_no', $numNo)
-        ->select('i.*', 'b.patient_prefix', 'b.sex', 'b.age_year', 'b.mobile_no', 'b.address', 'b.doctor_name')
+        ->where(function($q) use ($cleanNo, $numNo, $paddedNo) {
+            $q->where('i.invoice_no', $cleanNo);
+            if ($numNo > 0) {
+                $q->orWhere('i.invoice_no', 'like', "%/$paddedNo")
+                  ->orWhere('i.serial_no', $numNo);
+            }
+        });
+
+    $inv = $query->select('i.*', 'b.patient_prefix', 'b.sex', 'b.age_year', 'b.mobile_no', 'b.address', 'b.doctor_name')
         ->first();
 
     if (!$inv) {
