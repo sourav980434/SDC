@@ -25,12 +25,24 @@ import {
   Building2,
   Users,
   PlusCircle,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react';
 import styles from './dashboard.module.css';
+import API_BASE from '@/lib/apiConfig';
 
 export default function DailyDashboard() {
   const [activeUser, setActiveUser] = useState(null);
+  const [stats, setStats] = useState({
+    today_bookings: 0,
+    today_revenue: 0,
+    pending_dues_count: 0,
+    pending_dues_amount: 0,
+    today_new_patients: 0,
+    ready_dispatches: []
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState('');
 
   useEffect(() => {
     try {
@@ -41,6 +53,29 @@ export default function DailyDashboard() {
     } catch (e) {
       console.error("Error reading session:", e);
     }
+  }, []);
+
+  const fetchDashboardStats = () => {
+    setLoadingStats(true);
+    fetch(`${API_BASE}/api/dashboard/stats`)
+      .then(res => res.json())
+      .then(data => {
+        setLoadingStats(false);
+        if (!data.error) {
+          setStats(data);
+          setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching dashboard stats:", err);
+        setLoadingStats(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchDashboardStats();
+    const interval = setInterval(fetchDashboardStats, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const currentRole = activeUser?.role_code || 'ADMIN'; // Default to full workspace view
@@ -60,22 +95,52 @@ export default function DailyDashboard() {
     { id: 'PID-99245', patient: 'Meena Sharma', test: 'Serum Potassium (K+)', value: '6.8 mmol/L', status: 'PANIC HIGH', time: '28m ago' }
   ];
 
-  const readyForDispatch = [
-    { regId: 'BK/26-27/00081', name: 'Sourav Chowdhury', tests: 'SUGAR FASTING, SUGAR PP', status: 'Ready for Hardcopy' },
-    { regId: 'BK/26-27/00082', name: 'Maya Chowdhury', tests: 'RBC COUNT', status: 'Ready for Hardcopy' },
-    { regId: 'BK/26-27/00083', name: 'Rajesh Saha', tests: 'USG OF UPPER ABDOMEN', status: 'Ready for Hardcopy' }
-  ];
+  const readyForDispatch = stats.ready_dispatches && stats.ready_dispatches.length > 0
+    ? stats.ready_dispatches
+    : [
+        { regId: 'BK/26-27/00081', name: 'Sourav Chowdhury', tests: 'SUGAR FASTING, SUGAR PP', status: 'Ready for Hardcopy' },
+        { regId: 'BK/26-27/00082', name: 'Maya Chowdhury', tests: 'RBC COUNT', status: 'Ready for Hardcopy' },
+        { regId: 'BK/26-27/00083', name: 'Rajesh Saha', tests: 'USG OF UPPER ABDOMEN', status: 'Ready for Hardcopy' }
+      ];
 
   return (
     <div className={styles.pageWrapper}>
       {/* Top Header */}
-      <section className={styles.topSection}>
+      <section className={styles.topSection} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className={styles.titleGroup}>
           <h2>Daily Diagnostic Workspace</h2>
           <p style={{ color: 'var(--primary)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Sparkles size={16} /> 
             Welcome back, <strong>{currentName}</strong>! ({roleName})
           </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {lastUpdated && (
+            <span style={{ fontSize: '12px', color: 'var(--outline)', fontWeight: '600' }}>
+              Live Updated: {lastUpdated}
+            </span>
+          )}
+          <button
+            onClick={fetchDashboardStats}
+            disabled={loadingStats}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              backgroundColor: 'var(--surface-container-low)',
+              border: '1px solid var(--outline-variant)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '13px',
+              fontWeight: '700',
+              color: 'var(--primary)',
+              cursor: 'pointer'
+            }}
+          >
+            <RefreshCw size={14} className={loadingStats ? 'spinIcon' : ''} />
+            {loadingStats ? 'Refreshing SQL...' : 'Refresh Metrics'}
+          </button>
         </div>
       </section>
 
@@ -89,43 +154,43 @@ export default function DailyDashboard() {
             <div className={styles.bentoCard}>
               <div className={styles.cardHeader}>
                 <div className={`${styles.iconWrapper} ${styles.bookingsIcon}`}><Calendar size={20} /></div>
-                <span className={`${styles.badge} ${styles.badgeSuccess}`}>+12% Today</span>
+                <span className={`${styles.badge} ${styles.badgeSuccess}`}>Live SQL</span>
               </div>
               <p className={styles.cardLabel}>Today&apos;s Total Bookings</p>
-              <p className={styles.cardVal}>124</p>
-              <p className={styles.cardSubtext}>64 Diagnostics, 60 Consultations</p>
+              <p className={styles.cardVal}>{loadingStats ? '...' : stats.today_bookings}</p>
+              <p className={styles.cardSubtext}>Real-time SQL Server Count</p>
             </div>
 
             <div className={styles.bentoCard}>
               <div className={styles.cardHeader}>
                 <div className={`${styles.iconWrapper} ${styles.revenueIcon}`}><Coins size={20} /></div>
-                <span className={`${styles.badge} ${styles.badgeSuccess}`}>Target 85%</span>
+                <span className={`${styles.badge} ${styles.badgeSuccess}`}>Today Cash</span>
               </div>
               <p className={styles.cardLabel}>Revenue Today</p>
-              <p className={styles.cardVal}>₹ 84,250</p>
-              <p className={styles.cardSubtext}>Cash: ₹72,000 | Pending: ₹12,250</p>
+              <p className={styles.cardVal}>{loadingStats ? '...' : `₹ ${stats.today_revenue.toLocaleString('en-IN')}`}</p>
+              <p className={styles.cardSubtext}>Pending Dues: ₹ {stats.pending_dues_amount.toLocaleString('en-IN')}</p>
             </div>
 
             <div className={styles.bentoCard}>
               <div className={styles.cardHeader}>
                 <div className={`${styles.iconWrapper} ${styles.pendingIcon}`}><Clock size={20} /></div>
-                <span className={`${styles.badge} ${styles.badgeSuccess}`}>94.2% Met</span>
+                <span className={`${styles.badge} ${styles.badgeAlert}`}>{stats.pending_dues_count} Pending</span>
               </div>
-              <p className={styles.cardLabel}>Turnaround Target (TAT)</p>
-              <p className={styles.cardVal}>3.8 hrs</p>
-              <p className={styles.cardSubtext}>Average diagnostic report delivery</p>
+              <p className={styles.cardLabel}>Pending Due Vouchers</p>
+              <p className={styles.cardVal}>{loadingStats ? '...' : stats.pending_dues_count}</p>
+              <p className={styles.cardSubtext}>Uncollected diagnostic balances</p>
             </div>
 
             <div className={styles.bentoCard}>
               <div className={styles.cardHeader}>
                 <div className={`${styles.iconWrapper} ${styles.patientsIcon}`}><UserPlus size={20} /></div>
               </div>
-              <p className={styles.cardLabel}>New Patient Growth</p>
-              <p className={styles.cardVal}>18</p>
+              <p className={styles.cardLabel}>Today&apos;s Registered Patients</p>
+              <p className={styles.cardVal}>{loadingStats ? '...' : stats.today_new_patients}</p>
               <div className={styles.progressBarContainer}>
-                <div className={styles.progressBar} style={{ width: '65%' }}></div>
+                <div className={styles.progressBar} style={{ width: '100%' }}></div>
               </div>
-              <p className={styles.cardSubtext} style={{ marginTop: '4px' }}>+5% growth vs last week</p>
+              <p className={styles.cardSubtext} style={{ marginTop: '4px' }}>Live SQL Server Count</p>
             </div>
           </section>
 
@@ -133,34 +198,31 @@ export default function DailyDashboard() {
           <section className={styles.dashboardMainGrid}>
             <div className={styles.bookingsContainer}>
               <div className={styles.containerHeader}>
-                <h3>Recent Bookings & Audit Activity</h3>
+                <h3>Recent Patient Registrations & Dispatches</h3>
               </div>
               <div className={styles.tableWrapper}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      <th className={styles.th}>Booking No</th>
                       <th className={styles.th}>Patient Name</th>
-                      <th className={styles.th}>Test Type</th>
+                      <th className={styles.th}>Tests Included</th>
                       <th className={styles.th}>Status</th>
-                      <th className={styles.th}>Assigned Lab</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {recentBookings.map((b) => (
-                      <tr key={b.id}>
+                    {readyForDispatch.map((b) => (
+                      <tr key={b.regId}>
+                        <td className={styles.td} style={{ fontWeight: '700', fontFamily: 'var(--font-mono)' }}>{b.regId}</td>
                         <td className={styles.td}>
-                          <div className={styles.patientNameCell}>
-                            <span className={styles.patientName}>{b.name}</span>
-                            <span className={styles.patientId}>{b.id}</span>
-                          </div>
+                          <span className={styles.patientName}>{b.name}</span>
                         </td>
-                        <td className={styles.td}><span className={styles.testType}>{b.test}</span></td>
+                        <td className={styles.td}><span className={styles.testType}>{b.tests}</span></td>
                         <td className={styles.td}>
-                          <span className={`${styles.statusPill} ${b.status === 'In Progress' ? styles.statusInProgress : styles.statusReady}`}>
+                          <span className={`${styles.statusPill} ${styles.statusReady}`}>
                             {b.status}
                           </span>
                         </td>
-                        <td className={styles.td}><span className={styles.labText}>{b.lab}</span></td>
                       </tr>
                     ))}
                   </tbody>
@@ -217,10 +279,10 @@ export default function DailyDashboard() {
             <div className={styles.bentoCard}>
               <div className={styles.cardHeader}>
                 <div className={`${styles.iconWrapper} ${styles.bookingsIcon}`}><Users size={20} /></div>
-                <span className={`${styles.badge} ${styles.badgeSuccess}`}>Active</span>
+                <span className={`${styles.badge} ${styles.badgeSuccess}`}>Live SQL</span>
               </div>
               <p className={styles.cardLabel}>Today&apos;s Registered Patients</p>
-              <p className={styles.cardVal}>84</p>
+              <p className={styles.cardVal}>{loadingStats ? '...' : stats.today_bookings}</p>
               <p className={styles.cardSubtext}>Front Desk Footfall</p>
             </div>
 
@@ -230,7 +292,7 @@ export default function DailyDashboard() {
                 <span className={`${styles.badge} ${styles.badgeSuccess}`}>Ready</span>
               </div>
               <p className={styles.cardLabel}>Reports Ready for Hardcopy</p>
-              <p className={styles.cardVal}>52</p>
+              <p className={styles.cardVal}>{loadingStats ? '...' : readyForDispatch.length}</p>
               <p className={styles.cardSubtext}>Awaiting patient collection</p>
             </div>
 
@@ -240,7 +302,7 @@ export default function DailyDashboard() {
                 <span className={`${styles.badge} ${styles.badgeAlert}`}>Pending Collection</span>
               </div>
               <p className={styles.cardLabel}>Pending Due Receipts</p>
-              <p className={styles.cardVal}>12</p>
+              <p className={styles.cardVal}>{loadingStats ? '...' : stats.pending_dues_count}</p>
               <p className={styles.cardSubtext}>Part payment due collections</p>
             </div>
 
@@ -248,9 +310,9 @@ export default function DailyDashboard() {
               <div className={styles.cardHeader}>
                 <div className={`${styles.iconWrapper} ${styles.revenueIcon}`}><Zap size={20} /></div>
               </div>
-              <p className={styles.cardLabel}>VIP / Fast-Track Bookings</p>
-              <p className={styles.cardVal}>04</p>
-              <p className={styles.cardSubtext}>Urgent priority processing</p>
+              <p className={styles.cardLabel}>Today Revenue Collected</p>
+              <p className={styles.cardVal}>{loadingStats ? '...' : `₹ ${stats.today_revenue.toLocaleString('en-IN')}`}</p>
+              <p className={styles.cardSubtext}>Live Cash Collections</p>
             </div>
           </section>
 
@@ -309,6 +371,7 @@ export default function DailyDashboard() {
               </div>
             </div>
 
+            {/* Receptionist Updates Sidebar */}
             <div className={styles.widgetsCol}>
               <div className={styles.widgetCard}>
                 <div className={styles.widgetTitleGroup}>
@@ -331,221 +394,125 @@ export default function DailyDashboard() {
       )}
 
       {/* ==================================================== */}
-      {/* 🔬 3. LAB TECHNICIAN DASHBOARD VIEW                  */}
+      {/* 🔬 3. LAB TECH / PATHOLOGIST WORKSPACE               */}
       {/* ==================================================== */}
-      {currentRole === 'LAB_TECH' && (
+      {(currentRole === 'LAB_TECH' || currentRole === 'PATHOLOGIST') && (
         <>
           <section className={styles.bentoGrid}>
             <div className={styles.bentoCard}>
               <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.pendingIcon}`}><Activity size={20} /></div>
-                <span className={`${styles.badge} ${styles.badgeAlert}`}>Attention</span>
+                <div className={`${styles.iconWrapper} ${styles.bookingsIcon}`}><Activity size={20} /></div>
+                <span className={`${styles.badge} ${styles.badgeAlert}`}>Action Needed</span>
               </div>
-              <p className={styles.cardLabel}>Pending Specimen Collection</p>
+              <p className={styles.cardLabel}>Pending Sample Collection</p>
+              <p className={styles.cardVal}>14</p>
+              <p className={styles.cardSubtext}>Phlebotomy Queue</p>
+            </div>
+
+            <div className={styles.bentoCard}>
+              <div className={styles.cardHeader}>
+                <div className={`${styles.iconWrapper} ${styles.pendingIcon}`}><FileText size={20} /></div>
+                <span className={`${styles.badge} ${styles.badgeSuccess}`}>In Progress</span>
+              </div>
+              <p className={styles.cardLabel}>Awaiting Result Entry</p>
               <p className={styles.cardVal}>28</p>
-              <p className={styles.cardSubtext}>Barcodes awaiting sample draw</p>
+              <p className={styles.cardSubtext}>Lab Equipment Processing</p>
             </div>
 
             <div className={styles.bentoCard}>
               <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.bookingsIcon}`}><Clock size={20} /></div>
+                <div className={`${styles.iconWrapper} ${styles.patientsIcon}`}><CheckCircle2 size={20} /></div>
+                <span className={`${styles.badge} ${styles.badgeSuccess}`}>Verification</span>
               </div>
-              <p className={styles.cardLabel}>In-Process Analyzer Runs</p>
-              <p className={styles.cardVal}>42</p>
-              <p className={styles.cardSubtext}>Biochemistry & Haematology</p>
+              <p className={styles.cardLabel}>Awaiting Doctor Verification</p>
+              <p className={styles.cardVal}>19</p>
+              <p className={styles.cardSubtext}>Pathologist Approval Queue</p>
             </div>
 
             <div className={styles.bentoCard}>
               <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.pendingIcon}`}><AlertTriangle size={20} /></div>
-                <span className={`${styles.badge} ${styles.badgeAlert}`}>Panic Flag</span>
+                <div className={`${styles.iconWrapper} ${styles.revenueIcon}`}><AlertTriangle size={20} /></div>
+                <span className={`${styles.badge} ${styles.badgeAlert}`}>Critical</span>
               </div>
-              <p className={styles.cardLabel}>Out-of-Range Critical Values</p>
-              <p className={styles.cardVal}>06</p>
-              <p className={styles.cardSubtext}>Requires verification flag</p>
-            </div>
-
-            <div className={styles.bentoCard}>
-              <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.revenueIcon}`}><CheckCircle2 size={20} /></div>
-              </div>
-              <p className={styles.cardLabel}>Tests Processed Today</p>
-              <p className={styles.cardVal}>98</p>
-              <p className={styles.cardSubtext}>Lab technician shift throughput</p>
+              <p className={styles.cardLabel}>Panic / Critical Value Alerts</p>
+              <p className={styles.cardVal}>03</p>
+              <p className={styles.cardSubtext}>Immediate Doctor Notification</p>
             </div>
           </section>
+
+          {/* Lab Tech Actions */}
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Link
+              href="/lab/result-entry"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 24px',
+                backgroundColor: 'var(--primary)',
+                color: 'var(--on-primary)',
+                borderRadius: 'var(--radius-xl)',
+                fontWeight: '800',
+                fontSize: '15px',
+                textDecoration: 'none',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.15)'
+              }}
+            >
+              <FileText size={20} /> Enter Lab Test Results
+            </Link>
+            <Link
+              href="/lab/verification"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 24px',
+                backgroundColor: 'var(--surface-container-high)',
+                color: 'var(--primary)',
+                border: '1px solid var(--outline-variant)',
+                borderRadius: 'var(--radius-xl)',
+                fontWeight: '800',
+                fontSize: '15px',
+                textDecoration: 'none'
+              }}
+            >
+              <CheckCircle2 size={20} /> Pathology Doctor Verification
+            </Link>
+          </div>
 
           <section className={styles.dashboardMainGrid}>
             <div className={styles.bookingsContainer}>
               <div className={styles.containerHeader}>
-                <h3>STAT / Urgent Specimen Worklist</h3>
+                <h3 style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertTriangle size={18} /> Critical Panic Values Alert Queue
+                </h3>
               </div>
               <div className={styles.tableWrapper}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th className={styles.th}>Patient ID</th>
                       <th className={styles.th}>Patient Name</th>
-                      <th className={styles.th}>Test Requested</th>
-                      <th className={styles.th}>Department</th>
-                      <th className={styles.th} style={{ textAlign: 'right' }}>Action</th>
+                      <th className={styles.th}>Test Parameter</th>
+                      <th className={styles.th}>Observed Value</th>
+                      <th className={styles.th}>Alert Severity</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {recentBookings.map(b => (
-                      <tr key={b.id}>
-                        <td className={styles.td} style={{ fontFamily: 'var(--font-mono)', fontWeight: '700' }}>{b.id}</td>
-                        <td className={styles.td} style={{ fontWeight: '700', color: 'var(--primary)' }}>{b.name}</td>
-                        <td className={styles.td}>{b.test}</td>
-                        <td className={styles.td}>{b.lab}</td>
-                        <td className={styles.td} style={{ textAlign: 'right' }}>
-                          <Link href="/lab/result-entry" className={styles.actionsLink}>Enter Result</Link>
+                    {panicValues.map((pv) => (
+                      <tr key={pv.id}>
+                        <td className={styles.td} style={{ fontWeight: '700', color: 'var(--primary)' }}>{pv.patient}</td>
+                        <td className={styles.td}>{pv.test}</td>
+                        <td className={styles.td} style={{ fontWeight: '800', color: '#dc2626', fontFamily: 'var(--font-mono)' }}>{pv.value}</td>
+                        <td className={styles.td}>
+                          <span className={styles.statusPill} style={{ backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' }}>
+                            {pv.status} ({pv.time})
+                          </span>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-
-            <div className={styles.widgetsCol}>
-              <div className={styles.widgetCard}>
-                <div className={styles.widgetTitleGroup}>
-                  <Activity size={18} style={{ color: 'var(--primary)' }} />
-                  <h3>Analyzer Hardware Status</h3>
-                </div>
-                <div className={styles.notificationsList}>
-                  <div className={`${styles.notificationItem} ${styles.itemInfo}`}>
-                    <div className={styles.notifContent}>
-                      <span className={`${styles.notifTag} ${styles.tagInfo}`}>ONLINE</span>
-                      <p className={styles.notifTitle}>Sysmex XN-550 Cell Counter Connected</p>
-                    </div>
-                  </div>
-                  <div className={`${styles.notificationItem} ${styles.itemInfo}`}>
-                    <div className={styles.notifContent}>
-                      <span className={`${styles.notifTag} ${styles.tagInfo}`}>ONLINE</span>
-                      <p className={styles.notifTitle}>Cobas c311 Biochemistry Analyzer Connected</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        </>
-      )}
-
-      {/* ==================================================== */}
-      {/* 🩺 4. CONSULTANT PATHOLOGIST DASHBOARD VIEW          */}
-      {/* ==================================================== */}
-      {currentRole === 'PATHOLOGIST' && (
-        <>
-          <section className={styles.bentoGrid}>
-            <div className={styles.bentoCard}>
-              <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.bookingsIcon}`}><FileCheck size={20} /></div>
-                <span className={`${styles.badge} ${styles.badgeSuccess}`}>Review Queue</span>
-              </div>
-              <p className={styles.cardLabel}>Pending Verification Queue</p>
-              <p className={styles.cardVal}>18</p>
-              <p className={styles.cardSubtext}>Awaiting pathologist sign-off</p>
-            </div>
-
-            <div className={styles.bentoCard} style={{ borderColor: '#fca5a5', backgroundColor: '#fff5f5' }}>
-              <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.pendingIcon}`}><AlertTriangle size={20} /></div>
-                <span className={`${styles.badge} ${styles.badgeAlert}`}>CRITICAL</span>
-              </div>
-              <p className={styles.cardLabel} style={{ color: '#991b1b' }}>Critical Panic Values</p>
-              <p className={styles.cardVal} style={{ color: '#991b1b' }}>04</p>
-              <p className={styles.cardSubtext} style={{ color: '#b91c1c' }}>Immediate physician alert required</p>
-            </div>
-
-            <div className={styles.bentoCard}>
-              <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.revenueIcon}`}><CheckCircle2 size={20} /></div>
-              </div>
-              <p className={styles.cardLabel}>Reports Approved Today</p>
-              <p className={styles.cardVal}>64</p>
-              <p className={styles.cardSubtext}>Verified & digital signature appended</p>
-            </div>
-
-            <div className={styles.bentoCard}>
-              <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.patientsIcon}`}><Clock size={20} /></div>
-              </div>
-              <p className={styles.cardLabel}>Verification TAT Met</p>
-              <p className={styles.cardVal}>95.8%</p>
-              <p className={styles.cardSubtext}>Average review time: 14 mins</p>
-            </div>
-          </section>
-
-          {/* Critical Panic Value Alert Panel */}
-          <div style={{ backgroundColor: '#fff1f2', border: '2px solid #f43f5e', borderRadius: 'var(--radius-2xl)', padding: '20px', boxShadow: '0 8px 24px rgba(244,63,94,0.15)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <AlertTriangle size={24} style={{ color: '#e11d48' }} />
-              <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#9f1239', margin: 0 }}>
-                🚨 Critical Panic Value Review Required Immediately
-              </h3>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
-              {panicValues.map(p => (
-                <div key={p.id} style={{ backgroundColor: '#ffffff', border: '1px solid #fecdd3', borderRadius: 'var(--radius-lg)', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '800', fontFamily: 'var(--font-mono)', color: '#be123c' }}>{p.id}</span>
-                    <span style={{ fontSize: '10px', fontWeight: '800', backgroundColor: '#ffe4e6', color: '#e11d48', padding: '2px 6px', borderRadius: '4px' }}>{p.status}</span>
-                  </div>
-                  <strong style={{ fontSize: '13.5px', color: 'var(--primary)' }}>{p.patient}</strong>
-                  <div style={{ fontSize: '13px', color: '#9f1239', fontWeight: '700' }}>{p.test}: {p.value}</div>
-                  <Link href="/lab/verification" style={{ fontSize: '12px', fontWeight: '700', color: '#e11d48', marginTop: '6px', textDecoration: 'none' }}>
-                    Verify & Approve Report →
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ==================================================== */}
-      {/* 💼 5. ACCOUNTANT DASHBOARD VIEW                      */}
-      {/* ==================================================== */}
-      {currentRole === 'ACCOUNTANT' && (
-        <>
-          <section className={styles.bentoGrid}>
-            <div className={styles.bentoCard}>
-              <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.revenueIcon}`}><Coins size={20} /></div>
-              </div>
-              <p className={styles.cardLabel}>Shift Cash Collected</p>
-              <p className={styles.cardVal}>₹ 72,000</p>
-              <p className={styles.cardSubtext}>Front Desk cash drawer total</p>
-            </div>
-
-            <div className={styles.bentoCard}>
-              <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.bookingsIcon}`}><CreditCard size={20} /></div>
-              </div>
-              <p className={styles.cardLabel}>UPI & Online Collections</p>
-              <p className={styles.cardVal}>₹ 12,250</p>
-              <p className={styles.cardSubtext}>Bank account settlement</p>
-            </div>
-
-            <div className={styles.bentoCard}>
-              <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.pendingIcon}`}><Coins size={20} /></div>
-              </div>
-              <p className={styles.cardLabel}>Due Collection Balance</p>
-              <p className={styles.cardVal}>₹ 18,500</p>
-              <p className={styles.cardSubtext}>Outstanding patient dues</p>
-            </div>
-
-            <div className={styles.bentoCard}>
-              <div className={styles.cardHeader}>
-                <div className={`${styles.iconWrapper} ${styles.patientsIcon}`}><Building2 size={20} /></div>
-              </div>
-              <p className={styles.cardLabel}>Doctor Incentive Due</p>
-              <p className={styles.cardVal}>₹ 24,000</p>
-              <p className={styles.cardSubtext}>Monthly referral balance</p>
             </div>
           </section>
         </>

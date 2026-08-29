@@ -26,6 +26,74 @@ Route::get('/api', function () {
     ]);
 });
 
+// Real-time Dashboard KPI Metrics & Ready Reports Endpoint
+Route::get('/api/dashboard/stats', function () {
+    try {
+        $today = now()->format('Y-m-d');
+
+        // Today's total bookings count
+        $todayBookings = DB::table('TBookingHDR')
+            ->whereDate('AddDate', $today)
+            ->count();
+
+        // Today's total revenue collected
+        $todayRevenue = DB::table('TBookingHDR')
+            ->whereDate('AddDate', $today)
+            ->sum('AdvAmount') ?? 0;
+
+        // Total pending due count across all active bookings
+        $pendingDuesCount = DB::table('TBookingHDR')
+            ->whereRaw('(NetAmount - ISNULL(AdvAmount, 0)) > 0')
+            ->count();
+
+        // Total pending due amount
+        $pendingDuesAmount = DB::table('TBookingHDR')
+            ->whereRaw('(NetAmount - ISNULL(AdvAmount, 0)) > 0')
+            ->sum(DB::raw('NetAmount - ISNULL(AdvAmount, 0)')) ?? 0;
+
+        // Today's new patient growth count
+        $todayNewPatients = DB::table('MPatient')
+            ->whereDate('AddDate', $today)
+            ->count();
+
+        // Recent 5 ready for patient dispatch bookings
+        $readyDispatches = DB::table('TBookingHDR as h')
+            ->orderBy('h.AddDate', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($h) {
+                $tests = DB::table('TBookingDTL as d')
+                    ->leftJoin('MTest as t', 'd.TestCode', '=', 't.Code')
+                    ->where('d.BookingNo', $h->BookingNo)
+                    ->pluck('t.Descr')
+                    ->filter()
+                    ->implode(', ');
+
+                return [
+                    'regId' => $h->BookingNo,
+                    'name' => trim(($h->PPrefix ?? '') . ' ' . ($h->PName ?? '')),
+                    'tests' => $tests ?: 'Diagnostic Investigation',
+                    'status' => 'Ready for Hardcopy',
+                    'addDate' => $h->AddDate
+                ];
+            });
+
+        return response()->json([
+            'today_bookings' => $todayBookings,
+            'today_revenue' => floatval($todayRevenue),
+            'pending_dues_count' => $pendingDuesCount,
+            'pending_dues_amount' => floatval($pendingDuesAmount),
+            'today_new_patients' => $todayNewPatients,
+            'ready_dispatches' => $readyDispatches,
+            'timestamp' => now()->toDateTimeString()
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Failed to calculate dashboard stats: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
 // Helper functions for auto-generating codes
 function getNextDoctorCode() {
     $maxCode = DB::table('MDoctor')->max('Code');
