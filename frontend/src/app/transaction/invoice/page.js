@@ -40,13 +40,49 @@ export default function InvoicePage() {
     fetchInvoices(val);
   };
 
-  const handleOpenDetail = (invoiceNo) => {
-    fetch(`${API_BASE}/api/invoice/by-no/${encodeURIComponent(invoiceNo)}`)
+  const handleOpenDetail = (invRow) => {
+    if (!invRow) return;
+
+    // Instantly populate modal from row data
+    setSelectedInv({
+      invoiceNo: invRow.invoice_no,
+      bookingNo: invRow.booking_no,
+      patientCode: invRow.patient_code || '',
+      prefix: invRow.prefix || 'Mr.',
+      patientName: invRow.patient_name || 'Guest',
+      sex: invRow.sex || 'Male',
+      age: invRow.age || invRow.age_year || '',
+      phone: invRow.mobile_no || invRow.phone || '',
+      address: invRow.address || '',
+      referredBy: invRow.doctor_name || invRow.referredBy || 'Dr. SELF',
+      netAmount: parseFloat(invRow.net_amount || 0),
+      paidAmount: parseFloat(invRow.paid_amount || 0),
+      dueAmount: parseFloat(invRow.due_amount || 0),
+      discountValue: parseFloat(invRow.discount_value || 0),
+      status: invRow.invoice_status || (parseFloat(invRow.due_amount || 0) > 0 ? 'PARTIALLY PAID' : 'FULLY PAID'),
+      invoiceDate: invRow.invoice_date || '',
+      date_formatted: invRow.invoice_date || '',
+      items: [],
+      payments: []
+    });
+
+    // Asynchronously fetch extra items & payment details
+    fetch(`${API_BASE}/api/invoice/by-no/${encodeURIComponent(invRow.invoice_no)}`)
       .then(res => res.json())
       .then(data => {
-        setSelectedInv(data);
+        if (!data.error) {
+          setSelectedInv(prev => ({
+            ...prev,
+            ...data,
+            invoiceNo: data.invoiceNo || prev.invoiceNo,
+            bookingNo: data.bookingNo || prev.bookingNo,
+            patientName: data.patientName || prev.patientName,
+            items: data.items && data.items.length > 0 ? data.items : prev.items,
+            payments: data.payments && data.payments.length > 0 ? data.payments : prev.payments
+          }));
+        }
       })
-      .catch(err => alert("Error loading invoice details"));
+      .catch(err => console.error("Error loading extra invoice details:", err));
   };
 
   const handleSettleBalanceInInvoice = (bookingNo, dueAmt) => {
@@ -240,7 +276,7 @@ export default function InvoicePage() {
                     )}
                   </td>
                   <td className={styles.td} style={{ textAlign: 'right' }}>
-                    <button className={styles.btnView} onClick={() => handleOpenDetail(inv.invoice_no)}>
+                    <button className={styles.btnView} onClick={() => handleOpenDetail(inv)}>
                       <FileText size={14} style={{ marginRight: '4px' }} /> View & Settle
                     </button>
                   </td>

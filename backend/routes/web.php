@@ -1785,35 +1785,24 @@ Route::get('/api/invoice/list', function (Request $request) {
 
 Route::get('/api/invoice/by-no/{invoiceNo}', function ($invoiceNo) {
     $cleanNo = trim(urldecode($invoiceNo));
-    
-    $parts = explode('/', $cleanNo);
-    $lastPart = end($parts);
-    $numNo = intval(preg_replace('/[^0-9]/', '', $lastPart));
-    $paddedNo = str_pad($numNo, 5, '0', STR_PAD_LEFT);
 
-    $query = DB::table('tbl_web_invoice_hdr as i')
+    $inv = DB::table('tbl_web_invoice_hdr as i')
         ->leftJoin('tbl_web_booking_hdr as b', function($join) {
             $join->on('i.booking_id', '=', 'b.id')
                  ->orOn('i.booking_no', '=', 'b.booking_no');
         })
-        ->where(function($q) use ($cleanNo, $numNo, $paddedNo) {
-            $q->where('i.invoice_no', $cleanNo);
-            if ($numNo > 0) {
-                $q->orWhere('i.invoice_no', 'like', "%/$paddedNo")
-                  ->orWhere('i.serial_no', $numNo);
-            }
-        });
-
-    $inv = $query->select(
-        'i.*',
-        'b.patient_prefix as bk_prefix',
-        'b.patient_name as bk_patient_name',
-        'b.sex as bk_sex',
-        'b.age_year as bk_age_year',
-        'b.mobile_no as bk_mobile_no',
-        'b.address as bk_address',
-        'b.doctor_name as bk_doctor_name'
-    )->first();
+        ->where('i.invoice_no', $cleanNo)
+        ->orWhere('i.booking_no', $cleanNo)
+        ->select(
+            'i.*',
+            'b.patient_prefix as bk_prefix',
+            'b.patient_name as bk_patient_name',
+            'b.sex as bk_sex',
+            'b.age_year as bk_age_year',
+            'b.mobile_no as bk_mobile_no',
+            'b.address as bk_address',
+            'b.doctor_name as bk_doctor_name'
+        )->first();
 
     if (!$inv) {
         return response()->json(['error' => 'Invoice not found.'], 404);
