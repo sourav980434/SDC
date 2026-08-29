@@ -26,55 +26,54 @@ Route::get('/api', function () {
     ]);
 });
 
-// Real-time Dashboard KPI Metrics & Ready Reports Endpoint
+// Real-time Dashboard KPI Metrics & Ready Reports Endpoint (NEW WEB TABLES MAPPING)
 Route::get('/api/dashboard/stats', function () {
     try {
         $today = now()->format('Y-m-d');
 
-        // Today's total bookings count
-        $todayBookings = DB::table('TBookingHDR')
-            ->whereDate('AddDate', $today)
+        // Today's total web bookings count (from new tbl_web_booking_hdr table)
+        $todayBookings = DB::table('tbl_web_booking_hdr')
+            ->whereDate('created_at', $today)
             ->count();
 
-        // Today's total revenue collected
-        $todayRevenue = DB::table('TBookingHDR')
-            ->whereDate('AddDate', $today)
-            ->sum('AdvAmount') ?? 0;
+        // Today's total cash revenue collected in this application (from new tbl_web_payments table)
+        $todayRevenue = DB::table('tbl_web_payments')
+            ->whereDate('created_at', $today)
+            ->sum('amount') ?? 0;
 
-        // Total pending due count across all active bookings
-        $pendingDuesCount = DB::table('TBookingHDR')
-            ->whereRaw('(NetAmount - ISNULL(AdvAmount, 0)) > 0')
+        // Total pending due count across active web bookings
+        $pendingDuesCount = DB::table('tbl_web_booking_hdr')
+            ->where('due_amount', '>', 0)
             ->count();
 
         // Total pending due amount
-        $pendingDuesAmount = DB::table('TBookingHDR')
-            ->whereRaw('(NetAmount - ISNULL(AdvAmount, 0)) > 0')
-            ->sum(DB::raw('NetAmount - ISNULL(AdvAmount, 0)')) ?? 0;
+        $pendingDuesAmount = DB::table('tbl_web_booking_hdr')
+            ->where('due_amount', '>', 0)
+            ->sum('due_amount') ?? 0;
 
         // Today's new patient growth count
         $todayNewPatients = DB::table('MPatient')
             ->whereDate('AddDate', $today)
             ->count();
 
-        // Recent 5 ready for patient dispatch bookings
-        $readyDispatches = DB::table('TBookingHDR as h')
-            ->orderBy('h.AddDate', 'desc')
+        // Recent 5 ready for patient dispatch bookings created in this new web application
+        $readyDispatches = DB::table('tbl_web_booking_hdr as h')
+            ->orderBy('h.created_at', 'desc')
             ->limit(5)
             ->get()
             ->map(function ($h) {
-                $tests = DB::table('TBookingDTL as d')
-                    ->leftJoin('MTest as t', 'd.TestCode', '=', 't.Code')
-                    ->where('d.BookingNo', $h->BookingNo)
-                    ->pluck('t.Descr')
+                $tests = DB::table('tbl_web_booking_dtl as d')
+                    ->where('d.booking_id', $h->id)
+                    ->pluck('d.test_name')
                     ->filter()
                     ->implode(', ');
 
                 return [
-                    'regId' => $h->BookingNo,
-                    'name' => trim(($h->PPrefix ?? '') . ' ' . ($h->PName ?? '')),
+                    'regId' => $h->booking_no,
+                    'name' => trim(($h->patient_prefix ?? '') . ' ' . ($h->patient_name ?? '')),
                     'tests' => $tests ?: 'Diagnostic Investigation',
                     'status' => 'Ready for Hardcopy',
-                    'addDate' => $h->AddDate
+                    'addDate' => $h->created_at
                 ];
             });
 
