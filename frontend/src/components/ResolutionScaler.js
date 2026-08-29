@@ -42,9 +42,9 @@ export default function ResolutionScaler({ children }) {
         minHeight: `${heightPercent}vh`,
         height: `${heightPercent}vh`,
         zoom: scale, // Modern CSS Zoom scaling for 1920x1080 layout baseline
-        backgroundColor: 'var(--background)',
         display: 'flex',
         flexDirection: 'column',
+        flex: 1,
       }}
     >
       {children}
