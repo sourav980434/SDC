@@ -48,10 +48,10 @@ export default function InvoicePage() {
       invoiceNo: invRow.invoice_no,
       bookingNo: invRow.booking_no,
       patientCode: invRow.patient_code || '',
-      prefix: invRow.prefix || 'Mr.',
-      patientName: invRow.patient_name || 'Guest',
+      prefix: invRow.patient_prefix || invRow.prefix || 'Mr.',
+      patientName: invRow.patient_name || invRow.patientName || 'Guest',
       sex: invRow.sex || 'Male',
-      age: invRow.age || invRow.age_year || '',
+      age: invRow.age_year || invRow.age || '',
       phone: invRow.mobile_no || invRow.phone || '',
       address: invRow.address || '',
       referredBy: invRow.doctor_name || invRow.referredBy || 'Dr. SELF',
@@ -300,7 +300,7 @@ export default function InvoicePage() {
                     {inv.booking_no}
                   </td>
                   <td className={styles.td} style={{ fontWeight: '700' }}>
-                    {inv.prefix} {inv.patient_name}
+                    {inv.patient_prefix ? `${inv.patient_prefix} ` : (inv.prefix ? `${inv.prefix} ` : '')}{inv.patient_name}
                   </td>
                   <td className={styles.td} style={{ fontSize: '12px' }}>{inv.invoice_date}</td>
                   <td className={styles.td} style={{ fontWeight: '700' }}>₹ {parseFloat(inv.net_amount).toFixed(2)}</td>

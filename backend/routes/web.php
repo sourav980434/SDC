@@ -1769,16 +1769,30 @@ Route::get('/api/invoice/list', function (Request $request) {
     $search = trim($request->query('search', ''));
     $perPage = intval($request->query('per_page', 25));
 
-    $query = DB::table('tbl_web_invoice_hdr');
+    $query = DB::table('tbl_web_invoice_hdr as i')
+        ->leftJoin('tbl_web_booking_hdr as b', function($join) {
+            $join->on('i.booking_id', '=', 'b.id')
+                 ->orOn('i.booking_no', '=', 'b.booking_no');
+        });
+
     if ($search !== '') {
         $query->where(function($q) use ($search) {
-            $q->where('invoice_no', 'like', "%$search%")
-              ->orWhere('booking_no', 'like', "%$search%")
-              ->orWhere('patient_name', 'like', "%$search%");
+            $q->where('i.invoice_no', 'like', "%$search%")
+              ->orWhere('i.booking_no', 'like', "%$search%")
+              ->orWhere('i.patient_name', 'like', "%$search%")
+              ->orWhere('b.patient_name', 'like', "%$search%");
         });
     }
 
-    $invoices = $query->orderBy('created_at', 'desc')->paginate($perPage);
+    $invoices = $query->select(
+        'i.*',
+        'b.patient_prefix',
+        'b.sex',
+        'b.age_year',
+        'b.mobile_no',
+        'b.address',
+        'b.doctor_name'
+    )->orderBy('i.created_at', 'desc')->paginate($perPage);
 
     return response()->json($invoices);
 });
