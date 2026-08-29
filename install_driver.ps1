@@ -12,16 +12,19 @@ if (-not (Test-Path $phpPath)) {
     exit 1
 }
 
-# Detect PHP Version
-$phpVer = & $phpPath -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;"
-$phpMajor = & $phpPath -r "echo PHP_MAJOR_VERSION;"
-$phpMinor = & $phpPath -r "echo PHP_MINOR_VERSION;"
-$verTag = "$phpMajor$phpMinor"
+# Detect PHP Version cleanly using -n flag (bypasses php.ini startup warnings)
+$phpMajorStr = (& $phpPath -n -r "echo PHP_MAJOR_VERSION;").Trim()
+$phpMinorStr = (& $phpPath -n -r "echo PHP_MINOR_VERSION;").Trim()
+$phpVer = "${phpMajorStr}.${phpMinorStr}"
+$verTag = "${phpMajorStr}${phpMinorStr}"
 
-Write-Host "[1/4] Detected XAMPP PHP Version: $phpVer (Ver Tag: $verTag)" -ForegroundColor Green
+Write-Host "[1/4] Detected XAMPP PHP Version: $phpVer (Tag: $verTag)" -ForegroundColor Green
+
+$phpMajor = [int]$phpMajorStr
+$phpMinor = [int]$phpMinorStr
 
 # Choose Microsoft Driver Package
-if ([int]$phpMajor -ge 8 -and [int]$phpMinor -ge 3) {
+if ($phpMajor -ge 8 -and $phpMinor -ge 3) {
     $zipUrl = "https://github.com/microsoft/msphpsql/releases/download/v5.13.3/Windows_5.13.3RTW.zip"
 } else {
     $zipUrl = "https://github.com/microsoft/msphpsql/releases/download/v5.12.0/Windows_5.12.0RTW.zip"
