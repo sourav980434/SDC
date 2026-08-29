@@ -86,9 +86,10 @@
   font-weight: 700;
 }
 
+/* Form Grid - Locked 4-Column Layout for 1920x1080 Canvas */
 .formGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
 }
 
