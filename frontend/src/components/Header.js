@@ -22,6 +22,19 @@ export default function Header({ toggleSidebar }) {
   };
 
 
+  const [headerSearch, setHeaderSearch] = useState('');
+
+  const handleHeaderSearch = (e) => {
+    if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
+      e.preventDefault();
+      const q = headerSearch.trim();
+      if (!q) return;
+
+      router.push(`/booking?search=${encodeURIComponent(q)}&t=${Date.now()}`);
+      setHeaderSearch('');
+    }
+  };
+
   return (
     <header className={styles.header}>
       <div className={styles.headerLeft}>
@@ -35,6 +48,9 @@ export default function Header({ toggleSidebar }) {
             className={styles.searchInput}
             placeholder="Search patient or report ID..."
             type="text"
+            value={headerSearch}
+            onChange={(e) => setHeaderSearch(e.target.value)}
+            onKeyDown={handleHeaderSearch}
           />
         </div>
       </div>
