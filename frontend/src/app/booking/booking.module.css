@@ -55,33 +55,29 @@
 /* Two columns - Scaled for 1920x1080 Full HD & Fluid Responsiveness */
 .bookingGrid {
   display: grid;
-  grid-template-columns: 8.2fr 3.8fr;
-  gap: 14px;
-  flex: 1;
-  overflow: hidden;
-  min-height: 0;
+  grid-template-columns: minmax(0, 7.8fr) minmax(320px, 4.2fr);
+  gap: clamp(8px, 1vw, 14px);
+  min-height: min-content;
 }
 
 @media (max-width: 1200px) {
   .bookingGrid {
     grid-template-columns: 1fr;
-    overflow-y: auto;
   }
 }
 
 .formCol {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  overflow: hidden;
-  min-height: 0;
+  gap: clamp(6px, 1vh, 10px);
+  min-height: min-content;
 }
 
 .formCard {
   background-color: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-2xl);
-  padding: 12px 16px;
+  padding: clamp(6px, 1vh, 12px) clamp(8px, 1vw, 14px);
   box-shadow: 0 4px 12px var(--glass-shadow);
 }
 
@@ -89,12 +85,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: clamp(4px, 0.6vh, 8px);
   color: var(--secondary);
 }
 
 .formHeader h3 {
-  font-size: 13.5px;
+  font-size: clamp(12px, 0.8vw, 13.5px);
   font-weight: 700;
 }
 
@@ -102,7 +98,7 @@
 .formGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: clamp(6px, 0.8vh, 12px);
 }
 
 .colSpan2 {
@@ -320,9 +316,7 @@
 .billingCol {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
-  max-height: 100%;
+  gap: clamp(6px, 1vh, 10px);
 }
 
 .billingCard {
@@ -336,22 +330,22 @@
 .billingHeader {
   background-color: var(--secondary);
   color: #ffffff;
-  padding: 8px 12px;
+  padding: 6px 12px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .billingHeader h4 {
-  font-size: 13.5px;
+  font-size: clamp(12px, 0.8vw, 13.5px);
   font-weight: 700;
 }
 
 .billingBody {
-  padding: 12px;
+  padding: clamp(8px, 1vh, 12px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: clamp(4px, 0.8vh, 8px);
 }
 
 .billRow {

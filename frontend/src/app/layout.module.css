@@ -493,11 +493,11 @@
   opacity: 0.95;
 }
 
-/* Page Content Canvas - Zero Page Scroll 100% Viewport Responsiveness */
+/* Page Content Canvas - Dynamic Scaling & Graceful Scroll Responsiveness */
 .content {
   flex: 1;
-  overflow: hidden;
-  padding: 12px 20px;
+  overflow-y: auto;
+  padding: clamp(8px, 1.2vh, 16px) clamp(12px, 1.5vw, 24px);
   position: relative;
   width: 100%;
   box-sizing: border-box;
