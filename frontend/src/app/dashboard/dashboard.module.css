@@ -152,8 +152,8 @@
 /* Two Column Layout - Responsive Flex Baseline */
 .dashboardMainGrid {
   display: grid;
-  grid-template-columns: 2.2fr 1fr;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: 12px;
   flex: 1;
   overflow: hidden;
   min-height: 0;
@@ -241,7 +241,7 @@
 }
 
 .th {
-  padding: 8px 14px;
+  padding: 8px 12px;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -256,10 +256,9 @@
 }
 
 .td {
-  padding: 7px 14px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--outline-variant);
   line-height: 1.35;
-  white-space: nowrap;
 }
 
 .patientNameCell {
@@ -269,26 +268,24 @@
 
 .patientName {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--on-surface);
   white-space: nowrap;
 }
 
 .patientId {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--outline);
   margin-top: 2px;
 }
 
 .testType {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--on-surface);
-  white-space: nowrap;
-  max-width: 340px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
+  line-height: 1.35;
+  word-break: break-word;
+  font-weight: 500;
 }
 
 .statusPill {
@@ -397,14 +394,16 @@
 .widgetsCol {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .widgetCard {
   background-color: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-2xl);
-  padding: 24px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
 }
@@ -413,11 +412,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .widgetTitleGroup h3 {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--primary);
 }
@@ -425,7 +424,7 @@
 .notificationsList {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
 
 .notificationItem {
@@ -506,10 +505,10 @@
   background-color: var(--primary-container);
   color: #ffffff;
   border-radius: var(--radius-2xl);
-  padding: 24px;
+  padding: 12px 14px;
   position: relative;
   overflow: hidden;
-  height: 160px;
+  min-height: 95px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;

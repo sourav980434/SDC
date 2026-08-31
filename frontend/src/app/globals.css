@@ -103,6 +103,10 @@
   margin: 0;
 }
 
+html {
+  font-size: clamp(11.5px, 0.7vw + 3.5px, 15px);
+}
+
 html, body {
   background-color: var(--background, #f8fafc);
   color: var(--on-background);
