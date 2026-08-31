@@ -767,7 +767,7 @@ export default function NewBooking() {
         return;
       }
 
-      // 3. Up/Down Arrow Navigation inside Booking List Explorer Modal
+      // 3. Up/Down Arrow & Enter Navigation inside Booking List Explorer Modal
       if (showExplorerModal) {
         const currentData = explorerDataRef.current;
         if (currentData && currentData.length > 0) {
@@ -784,6 +784,18 @@ export default function NewBooking() {
             const prevIdx = Math.max(0, activeExplorerIndexRef.current - 1);
             updateActiveExplorerIndex(prevIdx);
             return;
+          }
+          if (e.key === 'Enter' || e.key === 'NumpadEnter') {
+            const activeTag = document.activeElement ? document.activeElement.tagName : '';
+            if (activeTag !== 'BUTTON') {
+              e.preventDefault();
+              e.stopPropagation();
+              const currentIdx = activeExplorerIndexRef.current;
+              if (currentData[currentIdx]) {
+                handleLoadBookingFromExplorer(currentData[currentIdx]);
+              }
+              return;
+            }
           }
         }
       }
@@ -3609,7 +3621,7 @@ export default function NewBooking() {
                   <input
                     ref={explorerSearchRef}
                     type="text"
-                    placeholder="Search by Booking No, Patient Name, Mobile, Doctor... (Press ↑/↓ to navigate)"
+                    placeholder="Search by Booking No, Patient Name, Mobile..."
                     value={explorerSearch}
                     onChange={(e) => {
                       setExplorerSearch(e.target.value);
@@ -3631,7 +3643,11 @@ export default function NewBooking() {
                       } else if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
                         e.preventDefault();
                         e.stopPropagation();
-                        fetchExplorerData({ search: explorerSearch, page: 1 });
+                        const list = explorerDataRef.current;
+                        const currentIdx = activeExplorerIndexRef.current;
+                        if (list && list[currentIdx]) {
+                          handleLoadBookingFromExplorer(list[currentIdx]);
+                        }
                       }
                     }}
                     style={{
