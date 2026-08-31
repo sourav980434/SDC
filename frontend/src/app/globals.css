@@ -50,6 +50,12 @@
   --glass-bg: rgba(255, 255, 255, 0.75);
   --glass-border: rgba(199, 197, 211, 0.4);
   --glass-shadow: rgba(7, 10, 97, 0.04);
+
+  /* Compact Responsive Scaling & Typography Tokens */
+  --font-size-body: clamp(11.5px, 0.85vw, 13px);
+  --line-height-body: 1.4;
+  --input-height: clamp(30px, 2.2vw, 36px);
+  --card-padding: clamp(8px, 1vw, 14px);
 }
 
 .dark {
