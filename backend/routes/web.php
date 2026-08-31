@@ -1527,6 +1527,53 @@ Route::get('/api/booking/by-no/{serial}', function ($serial) {
     ]);
 });
 
+// 3.1 Industry-Grade Universal Booking Search Endpoint
+Route::get('/api/booking/universal-search', function (Request $request) {
+    $q = trim($request->query('query', ''));
+    if ($q === '') {
+        return response()->json(['type' => 'none', 'message' => 'Empty search query']);
+    }
+
+    $numVal = intval(preg_replace('/[^0-9]/', '', $q));
+    $paddedSerial = ($numVal > 0 && $numVal < 100000) ? str_pad($numVal, 5, '0', STR_PAD_LEFT) : '';
+
+    $query = DB::table('tbl_web_booking_hdr as h')
+        ->where(function($builder) use ($q, $numVal, $paddedSerial) {
+            $builder->where('h.booking_no', 'like', '%' . $q . '%')
+                    ->orWhere('h.patient_name', 'like', '%' . $q . '%')
+                    ->orWhere('h.mobile_no', 'like', '%' . $q . '%')
+                    ->orWhere('h.doctor_name', 'like', '%' . $q . '%');
+            if ($numVal > 0) {
+                $builder->orWhere('h.serial_no', $numVal);
+                if ($paddedSerial !== '') {
+                    $builder->orWhere('h.booking_no', 'like', "%/$paddedSerial%");
+                }
+            }
+        });
+
+    $count = $query->count();
+
+    if ($count === 1) {
+        $singleHdr = $query->first();
+        return response()->json([
+            'type' => 'single',
+            'booking_no' => $singleHdr->booking_no,
+            'serial_no' => $singleHdr->serial_no
+        ]);
+    } else if ($count > 1) {
+        return response()->json([
+            'type' => 'multiple',
+            'count' => $count,
+            'query' => $q
+        ]);
+    } else {
+        return response()->json([
+            'type' => 'none',
+            'message' => "No booking found matching '{$q}'"
+        ]);
+    }
+});
+
 // 4. Get 5 Recent Bookings (From tbl_web_booking_hdr)
 Route::get('/api/booking/recent', function () {
     $recent = DB::table('tbl_web_booking_hdr')

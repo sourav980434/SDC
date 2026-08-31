@@ -159,6 +159,7 @@ export default function NewBooking() {
   const activeExplorerIndexRef = useRef(0);
   const explorerDataRef = useRef([]);
   const explorerSearchRef = useRef(null);
+  const [searchNotification, setSearchNotification] = useState('');
 
   useEffect(() => {
     activeExplorerIndexRef.current = activeExplorerIndex;
@@ -919,73 +920,42 @@ export default function NewBooking() {
   };
 
   const handleSearchSerial = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
       e.preventDefault();
-      
-      if (!bookingSerial.trim()) {
-        alert("Please enter a booking serial.");
+      const q = bookingSerial.trim();
+      if (!q) {
+        setSearchNotification("Please enter a booking serial, patient name, mobile, or booking number.");
+        setTimeout(() => setSearchNotification(''), 4000);
         return;
       }
 
-      const paddedSerial = String(parseInt(bookingSerial, 10) || 1).padStart(5, '0');
-      setBookingSerial(paddedSerial);
-      
-      fetch(`${API_BASE}/api/booking/by-no/${paddedSerial}`)
-        .then(res => {
-          if (!res.ok) throw new Error("Booking not found");
-          return res.json();
-        })
-        .then(data => {
-          if (data) {
-            // Set refs first to suppress auto-search dropdowns
-            lastSelectedNameRef.current = data.patientName || '';
-            lastSelectedPhoneRef.current = data.phone || '';
-            
-            setShowPatientNameResults(false);
-            setShowPatientPhoneResults(false);
-            setPatientNameResults([]);
-            setPatientPhoneResults([]);
-            setShowDrResults(false);
-            setShowResults(false);
+      setSearchNotification('');
 
-            setPatientCode(data.patientCode || '');
-            setPrefix(data.prefix || 'Mr.');
-            setPatientName(data.patientName || '');
-            setAge(data.age || '');
-            setAgeUnit(data.ageUnit || 'Yrs');
-            setSex(data.sex || 'Male');
-            setPhone(data.phone || '');
-            setAddress(data.address || '');
-            setReferredBy(data.referredBy || '');
-            if (data.selectedDoctor) {
-              setSelectedDoctor(data.selectedDoctor);
-            }
-            const loadedTests = (data.selectedTests || []).map(t => ({
-              ...t,
-              delivery_date: t.delivery_date || calculateDeliveryDate(t.duration || 0)
-            }));
-            setSelectedTests(loadedTests);
-            setDiscountValue(data.discountValue || '');
-            setCollectionCharge(data.collectionCharge ? String(data.collectionCharge) : '');
-            setProcedureCharge(data.procedureCharge ? String(data.procedureCharge) : '');
-            setReceivedAmount(''); // Keep empty for new payment entry
-            setPaymentMethod(data.paymentMethod || 'Cash');
-            setBookingNo(data.bookingNo);
-            setSavedBookingNo(data.bookingNo);
-            setPaymentsList(data.payments || []);
-
-            if (data.created_at_formatted || data.date) {
-              const formattedDate = data.created_at_formatted || (data.date ? new Date(data.date).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '');
-              const user = data.created_by_user || 'Admin';
-              setSavedBillInfo({ date: formattedDate, user: user });
-            } else {
-              setSavedBillInfo(null);
-            }
+      fetch(`${API_BASE}/api/booking/universal-search?query=${encodeURIComponent(q)}`)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.type === 'single') {
+            const targetSerial = resData.serial_no;
+            handleLoadBookingFromExplorer({ serialNo: targetSerial });
+          } else if (resData.type === 'multiple') {
+            setExplorerSearch(q);
+            fetchExplorerData({ search: q, page: 1 });
+            setShowExplorerModal(true);
+          } else {
+            setSearchNotification(`No booking found matching "${q}"`);
+            setTimeout(() => setSearchNotification(''), 4000);
           }
         })
-        .catch(err => {
-          alert(`Result not found / Booking not found in database for serial: ${paddedSerial}`);
-          handleClearForm();
+        .catch(() => {
+          // Fallback to direct serial lookup for safety
+          const numVal = parseInt(q, 10);
+          if (!isNaN(numVal) && numVal > 0) {
+            const paddedSerial = String(numVal).padStart(5, '0');
+            handleLoadBookingFromExplorer({ serialNo: paddedSerial });
+          } else {
+            setSearchNotification(`No booking found matching "${q}"`);
+            setTimeout(() => setSearchNotification(''), 4000);
+          }
         });
     }
   };
@@ -1712,6 +1682,23 @@ export default function NewBooking() {
             <p style={{ fontSize: '11.5px', color: 'var(--secondary)', fontWeight: '600', marginTop: '4px', textAlign: 'right' }}>
               Last Saved: <span style={{ fontFamily: 'var(--font-mono)' }}>{lastSavedTimestamp}</span>
             </p>
+          )}
+          {searchNotification && (
+            <div style={{
+              marginTop: '6px',
+              padding: '6px 12px',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fca5a5',
+              borderRadius: 'var(--radius-md)',
+              color: '#b91c1c',
+              fontSize: '12px',
+              fontWeight: '700',
+              textAlign: 'right',
+              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)',
+              animation: 'fadeIn 0.2s ease-in-out'
+            }}>
+              ⚠️ {searchNotification}
+            </div>
           )}
         </div>
       </section>
