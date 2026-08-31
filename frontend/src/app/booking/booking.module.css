@@ -1,10 +1,9 @@
 .pageWrapper {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  max-height: 100%;
-  overflow: hidden;
-  gap: 10px;
+  gap: clamp(8px, 1vh, 12px);
+  width: 100%;
+  min-height: min-content;
 }
 
 .topSection {
