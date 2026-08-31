@@ -1,6 +1,14 @@
 import { numberToWords, generateReportPin } from './numberToWords';
+import { getCachedLabSettings } from './labSettings';
 
 export function generateA5BillReceiptHTML(data) {
+  const labConfig = getCachedLabSettings() || {};
+  const printLabName = data.labName || labConfig.lab_name || 'Santoshpur Diagnostic Centre & Polyclinic';
+  const printLabAddress = data.labAddress || labConfig.lab_address || '286, S.N. Roy Road, Santoshpur, Kolkata - 700075';
+  const printLabPhone = data.labPhone || labConfig.lab_phone || '+91 33 2400 0000 / 2400 1111';
+  const printLabSubtitle = `${printLabAddress} • Phone: ${printLabPhone}`;
+  const printShortName = labConfig.lab_short_name || 'SDCP';
+
   const {
     invoiceNo = 'INV/26-27/00001',
     invoiceDate = new Date().toLocaleString('en-GB'),
@@ -403,7 +411,7 @@ export function generateA5BillReceiptHTML(data) {
     <!-- Circular Rubber Stamp Seal Watermark -->
     <div class="watermark-stamp ${isFullyPaid ? 'stamp-paid' : 'stamp-due'}">
       <div class="stamp-inner">
-        <div class="stamp-org">SANTOSHPUR DIAGNOSTIC</div>
+        <div class="stamp-org">${printShortName}</div>
         <div class="stamp-text">${isFullyPaid ? 'FULLY PAID' : 'BALANCE DUE'}</div>
         <div class="stamp-date">${invoiceDate ? invoiceDate.split(' ')[0] : ''}</div>
       </div>
@@ -413,8 +421,8 @@ export function generateA5BillReceiptHTML(data) {
     <table class="header-table">
       <tr>
         <td>
-          <div class="org-title">Santoshpur Diagnostic Centre & Polyclinic</div>
-          <div class="org-subtitle">Santoshpur, South 24 Parganas, WB • Phone: +91 9804349061</div>
+          <div class="org-title">${printLabName}</div>
+          <div class="org-subtitle">${printLabSubtitle}</div>
         </td>
         <td class="voucher-title-box">
           <div class="voucher-title">FINAL BILL RECEIPT</div>

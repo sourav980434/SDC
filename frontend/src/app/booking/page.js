@@ -38,6 +38,7 @@ import { generateA5BookingReceiptHTML } from '@/lib/bookingReceiptTemplate';
 import { generateA5BillReceiptHTML } from '@/lib/billReceiptTemplate';
 import { generateA5PartPaymentReceiptHTML } from '@/lib/partPaymentReceiptTemplate';
 import { generateA5DepartmentSlipsHTML } from '@/lib/deptSlipTemplate';
+import { fetchLabSettings, getCachedLabSettings } from '@/lib/labSettings';
 
 export default function NewBooking() {
   const searchParams = useSearchParams();
@@ -46,6 +47,7 @@ export default function NewBooking() {
   const [activeUserSession, setActiveUserSession] = useState(null);
 
   useEffect(() => {
+    fetchLabSettings();
     try {
       const stored = sessionStorage.getItem('sdcp_user_session');
       if (stored) {

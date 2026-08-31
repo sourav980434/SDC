@@ -1,5 +1,7 @@
 
 
+import { getCachedLabSettings } from './labSettings';
+
 function getSpecimenGuidance(testName = '') {
   const name = testName.toUpperCase();
   if (name.includes('SUGAR') || name.includes('FBS') || name.includes('PPBS')) {
@@ -38,6 +40,12 @@ function getDeptTheme(deptName = '') {
 }
 
 export function generateA5DepartmentSlipsHTML(data) {
+  const labConfig = getCachedLabSettings() || {};
+  const printLabName = data.labName || labConfig.lab_name || 'Santoshpur Diagnostic Centre & Polyclinic';
+  const printLabAddress = data.labAddress || labConfig.lab_address || '286, S.N. Roy Road, Santoshpur, Kolkata - 700075';
+  const printLabPhone = data.labPhone || labConfig.lab_phone || '+91 33 2400 0000 / 2400 1111';
+  const printLabSubtitle = `${printLabAddress} • Phone: ${printLabPhone}`;
+
   const {
     bookingNo = 'BK/26-27/00001',
     bookingDate = new Date().toLocaleString('en-GB'),
@@ -87,8 +95,8 @@ export function generateA5DepartmentSlipsHTML(data) {
         <table class="header-table">
           <tr>
             <td>
-              <div class="org-title">Santoshpur Diagnostic Centre & Polyclinic</div>
-              <div class="org-subtitle">Santoshpur, South 24 Parganas, WB • Phone: +91 9804349061</div>
+              <div class="org-title">${printLabName}</div>
+              <div class="org-subtitle">${printLabSubtitle}</div>
             </td>
             <td class="voucher-title-box">
               <div class="voucher-title" style="color: ${theme.mainColor}; background: ${theme.bgLight}; border-color: ${theme.borderColor};">
