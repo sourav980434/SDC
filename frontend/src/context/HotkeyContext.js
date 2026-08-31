@@ -77,6 +77,7 @@ export function HotkeyProvider({ children }) {
 
   // Standard keypress parser helper
   const parseKeyEvent = useCallback((e) => {
+    if (!e || !e.key || typeof e.key !== 'string') return '';
     const parts = [];
     if (e.ctrlKey) parts.push('Ctrl');
     if (e.shiftKey) parts.push('Shift');
@@ -97,7 +98,9 @@ export function HotkeyProvider({ children }) {
   // Global keydown listener for navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (!e || !e.key) return;
       const combo = parseKeyEvent(e);
+      if (!combo) return;
 
       // We handle global navigation hotkeys here
       if (combo === shortcuts.GOTO_DASHBOARD.key) {
