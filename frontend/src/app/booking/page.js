@@ -998,6 +998,11 @@ export default function NewBooking() {
       });
   };
 
+  const updateActiveExplorerIndex = (idx) => {
+    setActiveExplorerIndex(idx);
+    activeExplorerIndexRef.current = idx;
+  };
+
   const fetchExplorerData = (opts = {}) => {
     setExplorerLoading(true);
     const searchVal = opts.search !== undefined ? opts.search : explorerSearch;
@@ -1017,7 +1022,8 @@ export default function NewBooking() {
       .then(resData => {
         const list = resData.data || [];
         setExplorerData(list);
-        setActiveExplorerIndex(0);
+        explorerDataRef.current = list;
+        updateActiveExplorerIndex(0);
         setExplorerSummary(resData.summary || null);
         setExplorerPage(resData.current_page || 1);
         setExplorerLastPage(resData.last_page || 1);
@@ -1031,7 +1037,7 @@ export default function NewBooking() {
   };
 
   const handleOpenExplorerModal = () => {
-    setActiveExplorerIndex(0);
+    updateActiveExplorerIndex(0);
     setShowExplorerModal(true);
     fetchExplorerData();
   };
@@ -3571,6 +3577,28 @@ export default function NewBooking() {
                       setExplorerSearch(e.target.value);
                       fetchExplorerData({ search: e.target.value, page: 1 });
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const list = explorerDataRef.current;
+                        if (list && list.length > 0) {
+                          updateActiveExplorerIndex(Math.min(list.length - 1, activeExplorerIndexRef.current + 1));
+                        }
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        const list = explorerDataRef.current;
+                        if (list && list.length > 0) {
+                          updateActiveExplorerIndex(Math.max(0, activeExplorerIndexRef.current - 1));
+                        }
+                      } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const list = explorerDataRef.current;
+                        const activeItem = list[activeExplorerIndexRef.current];
+                        if (activeItem) {
+                          handleLoadBookingFromExplorer(activeItem);
+                        }
+                      }
+                    }}
                     style={{
                       width: '100%',
                       padding: '7px 12px 7px 32px',
@@ -3701,13 +3729,21 @@ export default function NewBooking() {
                       return (
                         <tr
                           key={item.id}
+                          tabIndex={0}
                           ref={isActive ? activeExplorerRowRef : null}
-                          onClick={() => setActiveExplorerIndex(idx)}
+                          onClick={() => updateActiveExplorerIndex(idx)}
                           onDoubleClick={() => handleLoadBookingFromExplorer(item)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleLoadBookingFromExplorer(item);
+                            }
+                          }}
                           style={{
                             borderBottom: '1px solid var(--outline-variant)',
                             backgroundColor: isActive ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
                             borderLeft: isActive ? '4px solid var(--primary)' : '4px solid transparent',
+                            outline: 'none',
                             cursor: 'pointer',
                             transition: 'all 0.15s ease'
                           }}
