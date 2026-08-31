@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './login.module.css';
-import { Activity, Lock, User, LogIn, AlertCircle, Eye, EyeOff, ShieldCheck, HeartPulse } from 'lucide-react';
+import { Lock, User, LogIn, AlertCircle, Eye, EyeOff, HeartPulse } from 'lucide-react';
 
 import API_BASE from '@/lib/apiConfig';
 import { useAuth } from '@/context/AuthContext';
@@ -21,35 +21,11 @@ export default function LoginPage() {
   const [isCapsLock, setIsCapsLock] = useState(false);
   const [labConfig, setLabConfig] = useState(DEFAULT_LAB_CONFIG);
 
-  // 3D Tilt Ref
-  const cardRef = useRef(null);
-  const [tiltStyle, setTiltStyle] = useState({ transform: 'rotateX(0deg) rotateY(0deg)' });
-
   useEffect(() => {
     fetchLabSettings().then(cfg => {
       if (cfg) setLabConfig(cfg);
     });
   }, []);
-
-  const handleMouseMove = (e) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-
-    const rotX = (-y / (rect.height / 2)) * 6; // max 6 deg
-    const rotY = (x / (rect.width / 2)) * 6;   // max 6 deg
-
-    setTiltStyle({
-      transform: `perspective(1000px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setTiltStyle({
-      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)'
-    });
-  };
 
   const handleKeyDownPassword = (e) => {
     if (e.getModifierState) {
@@ -92,50 +68,28 @@ export default function LoginPage() {
     setPassword(p);
   };
 
-  // Determine Background & Theme
-  const themePreset = labConfig.login_theme_preset || 'light_soft';
-  const customBgUrl = labConfig.login_bg_image_url;
+  // Determine Background & Theme - Defaults to Santoshpur Building Photo with 80% Overlay
+  const bgImage = labConfig.login_bg_image_url || '/santoshpur_building.jpg';
   const logoAnim = labConfig.login_logo_animation || 'pulse';
 
-  let wrapperStyle = {};
-  if (themePreset === 'custom_image' && customBgUrl) {
-    wrapperStyle = {
-      backgroundImage: `linear-gradient(rgba(240, 244, 249, 0.75), rgba(240, 244, 249, 0.85)), url(${customBgUrl})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center'
-    };
-  } else if (themePreset === 'medical_blue') {
-    wrapperStyle = {
-      background: 'radial-gradient(circle at 50% 30%, #0f172a 0%, #070a61 60%, #020617 100%)'
-    };
-  } else if (themePreset === 'clean_white') {
-    wrapperStyle = {
-      background: '#ffffff'
-    };
-  }
-
-  const isDarkPreset = themePreset === 'medical_blue';
+  const wrapperStyle = {
+    backgroundImage: `linear-gradient(rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.85)), url('${bgImage}')`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat'
+  };
 
   return (
-    <div
-      className={`${styles.loginWrapper} ${isDarkPreset ? styles.loginWrapperDark : ''}`}
-      style={wrapperStyle}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-    >
-      <div
-        ref={cardRef}
-        className={`${styles.loginCard} ${isDarkPreset ? styles.loginCardDark : ''}`}
-        style={tiltStyle}
-      >
+    <div className={styles.loginWrapper} style={wrapperStyle}>
+      <div className={styles.loginCard}>
         <div className={styles.header}>
           <div className={`${styles.logoBadge} ${logoAnim === 'spin' ? styles.animSpin : (logoAnim === 'float' ? styles.animFloat : styles.animPulse)}`}>
             <HeartPulse size={32} />
           </div>
-          <h1 className={styles.title} style={{ color: isDarkPreset ? '#ffffff' : 'var(--primary, #070a61)' }}>
+          <h1 className={styles.title}>
             {labConfig.lab_name || 'Santoshpur Diagnostic Centre'}
           </h1>
-          <p className={styles.subtitle} style={{ color: isDarkPreset ? '#94a3b8' : '#64748b' }}>
+          <p className={styles.subtitle}>
             Clinical LIMS & Web Authorization Portal
           </p>
         </div>
@@ -149,12 +103,12 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className={styles.form}>
           <div className={styles.inputGroup}>
-            <label className={`${styles.label} ${isDarkPreset ? styles.labelDark : ''}`}>Username / Login ID</label>
+            <label className={styles.label}>Username / Login ID</label>
             <div className={styles.inputWrapper}>
               <User size={18} className={styles.inputIcon} />
               <input
                 type="text"
-                className={`${styles.input} ${isDarkPreset ? styles.inputDark : ''}`}
+                className={styles.input}
                 placeholder="Enter username (e.g. ADMIN)"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -166,7 +120,7 @@ export default function LoginPage() {
 
           <div className={styles.inputGroup}>
             <div className={styles.labelRow}>
-              <label className={`${styles.label} ${isDarkPreset ? styles.labelDark : ''}`}>Password</label>
+              <label className={styles.label}>Password</label>
               {isCapsLock && (
                 <span className={styles.capsBadge}>⚠️ Caps Lock is ON</span>
               )}
@@ -175,7 +129,7 @@ export default function LoginPage() {
               <Lock size={18} className={styles.inputIcon} />
               <input
                 type={showPassword ? 'text' : 'password'}
-                className={`${styles.input} ${isDarkPreset ? styles.inputDark : ''}`}
+                className={styles.input}
                 placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

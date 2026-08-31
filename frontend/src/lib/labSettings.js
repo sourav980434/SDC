@@ -11,8 +11,8 @@ export const DEFAULT_LAB_CONFIG = {
   lab_certification: 'ISO 9001:2015 CERTIFIED',
   report_disclaimer: 'Document generated digitally from LIMS Database. Suggested clinical correlation and repeat examination if necessary.',
   copyright_text: 'All Rights Reserved.',
-  login_bg_image_url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1920&q=80',
-  login_theme_preset: 'light_soft',
+  login_bg_image_url: '/santoshpur_building.jpg',
+  login_theme_preset: 'building_image',
   login_logo_animation: 'pulse',
   report_signatories: [
     { name: 'Medical Technologist', designation: 'Checked By', isDoctor: false },

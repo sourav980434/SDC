@@ -20,26 +20,18 @@
 }
 
 .loginCard {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: 24px;
+  border-radius: 22px;
   padding: 36px 32px;
   width: 100%;
-  max-width: 440px;
-  box-shadow: 0 25px 60px -15px rgba(7, 10, 97, 0.14), 0 0 1px 1px rgba(255, 255, 255, 0.8) inset;
+  max-width: 430px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
   gap: 20px;
-  transition: transform 0.15s ease-out, box-shadow 0.2s ease;
-  transform-style: preserve-3d;
-}
-
-.loginCardDark {
-  background: rgba(15, 23, 42, 0.85);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6);
 }
 
 .header {
