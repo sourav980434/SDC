@@ -919,44 +919,44 @@ export default function NewBooking() {
     return result.trim() + ' Rupees Only';
   };
 
+  const triggerUniversalSearch = (rawQuery) => {
+    const q = (rawQuery || bookingSerial || '').trim();
+    if (!q) {
+      handleOpenExplorerModal();
+      return;
+    }
+
+    setSearchNotification('');
+
+    fetch(`${API_BASE}/api/booking/universal-search?query=${encodeURIComponent(q)}`)
+      .then(res => res.json())
+      .then(resData => {
+        if (resData.type === 'single') {
+          const targetSerial = resData.serial_no;
+          handleLoadBookingFromExplorer({ serialNo: targetSerial });
+        } else {
+          setExplorerSearch(q);
+          fetchExplorerData({ search: q, page: 1 });
+          setShowExplorerModal(true);
+        }
+      })
+      .catch(() => {
+        const numVal = parseInt(q, 10);
+        if (!isNaN(numVal) && numVal > 0) {
+          const paddedSerial = String(numVal).padStart(5, '0');
+          handleLoadBookingFromExplorer({ serialNo: paddedSerial });
+        } else {
+          setExplorerSearch(q);
+          fetchExplorerData({ search: q, page: 1 });
+          setShowExplorerModal(true);
+        }
+      });
+  };
+
   const handleSearchSerial = (e) => {
     if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
       e.preventDefault();
-      const q = bookingSerial.trim();
-      if (!q) {
-        setSearchNotification("Please enter a booking serial, patient name, mobile, or booking number.");
-        setTimeout(() => setSearchNotification(''), 4000);
-        return;
-      }
-
-      setSearchNotification('');
-
-      fetch(`${API_BASE}/api/booking/universal-search?query=${encodeURIComponent(q)}`)
-        .then(res => res.json())
-        .then(resData => {
-          if (resData.type === 'single') {
-            const targetSerial = resData.serial_no;
-            handleLoadBookingFromExplorer({ serialNo: targetSerial });
-          } else if (resData.type === 'multiple') {
-            setExplorerSearch(q);
-            fetchExplorerData({ search: q, page: 1 });
-            setShowExplorerModal(true);
-          } else {
-            setSearchNotification(`No booking found matching "${q}"`);
-            setTimeout(() => setSearchNotification(''), 4000);
-          }
-        })
-        .catch(() => {
-          // Fallback to direct serial lookup for safety
-          const numVal = parseInt(q, 10);
-          if (!isNaN(numVal) && numVal > 0) {
-            const paddedSerial = String(numVal).padStart(5, '0');
-            handleLoadBookingFromExplorer({ serialNo: paddedSerial });
-          } else {
-            setSearchNotification(`No booking found matching "${q}"`);
-            setTimeout(() => setSearchNotification(''), 4000);
-          }
-        });
+      triggerUniversalSearch(bookingSerial);
     }
   };
 
@@ -1665,7 +1665,7 @@ export default function NewBooking() {
         <div className={styles.voucherInfo}>
           <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
             <span>Booking No:</span>
-            <span className={styles.voucherNo} style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <span className={styles.voucherNo} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               BK/{bookingNo.split('/')[1] || '26-27'}/
               <input 
                 type="text" 
@@ -1673,8 +1673,29 @@ export default function NewBooking() {
                 value={bookingSerial}
                 onChange={(e) => setBookingSerial(e.target.value)}
                 onKeyDown={handleSearchSerial}
-                title="Type serial number and press Enter to search"
+                placeholder="00000"
+                title="Type serial number, patient name, phone, or booking no and press Enter to search"
               />
+              <button
+                type="button"
+                onClick={() => triggerUniversalSearch(bookingSerial)}
+                style={{
+                  background: 'var(--primary-container)',
+                  border: '1px solid var(--outline-variant)',
+                  color: 'var(--on-primary-container)',
+                  cursor: 'pointer',
+                  padding: '4px 6px',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}
+                title="Click to search booking"
+              >
+                <Search size={14} /> Search
+              </button>
             </span>
           </p>
           <p>Date: <span>{currentDate}</span> | Time: <span>{currentTime}</span></p>
