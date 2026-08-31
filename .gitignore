@@ -27,6 +27,8 @@ Thumbs.db
 *.gif
 *.mp4
 *.avi
+!frontend/public/*
+!frontend/public/**/*
 
 # Report Templates (Word/Excel) - kept on disk only
 REPORT MASTER/
