@@ -333,6 +333,35 @@
   font-weight: 700;
 }
 
+.sidebarLogoffBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-top: 6px;
+  background: rgba(225, 29, 72, 0.12);
+  border: 1px solid rgba(225, 29, 72, 0.25);
+  border-radius: 10px;
+  color: #f87171;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.sidebarLogoffBtn:hover {
+  background: #e11d48;
+  color: #ffffff;
+  border-color: #e11d48;
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.35);
+}
+
+.sidebarCollapsed .sidebarLogoffBtn {
+  justify-content: center;
+  padding: 8px 0;
+}
+
 .legacyBadge {
   font-size: 9px;
   background-color: #0284c7;

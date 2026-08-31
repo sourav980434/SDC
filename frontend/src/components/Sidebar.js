@@ -433,17 +433,18 @@ export default function Sidebar({ isOpen }) {
                 <span className={styles.userRole}>{activeUser.role_name || activeUser.role_code}</span>
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => logout()}
-              className={styles.sidebarLogoffBtn}
-              title="Log Off Session"
-            >
-              <LogOut size={14} />
-              {!isCollapsed && <span>Log Off</span>}
-            </button>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={() => logout()}
+          className={styles.sidebarLogoffBtn}
+          title="Log Off Session"
+        >
+          <LogOut size={16} />
+          {!isCollapsed && <span>Log Off</span>}
+        </button>
       </div>
     </aside>
   );
