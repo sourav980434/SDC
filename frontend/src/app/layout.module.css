@@ -493,11 +493,11 @@
   opacity: 0.95;
 }
 
-/* Page Content Canvas - Fluid 100% Width Responsiveness */
+/* Page Content Canvas - Zero Page Scroll 100% Viewport Responsiveness */
 .content {
   flex: 1;
-  overflow-y: auto;
-  padding: 14px 20px;
+  overflow: hidden;
+  padding: 12px 20px;
   position: relative;
   width: 100%;
   box-sizing: border-box;
