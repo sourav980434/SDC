@@ -730,7 +730,7 @@ export default function NewBooking() {
         return;
       }
 
-      // 3. Up/Down Arrow & Enter Key Navigation inside Booking List Explorer Modal
+      // 3. Up/Down Arrow Navigation inside Booking List Explorer Modal
       if (showExplorerModal) {
         const currentData = explorerDataRef.current;
         if (currentData && currentData.length > 0) {
@@ -747,18 +747,6 @@ export default function NewBooking() {
             const prevIdx = Math.max(0, activeExplorerIndexRef.current - 1);
             updateActiveExplorerIndex(prevIdx);
             return;
-          }
-          if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
-            const targetTag = e.target ? e.target.tagName.toLowerCase() : '';
-            if (targetTag !== 'button') {
-              e.preventDefault();
-              e.stopPropagation();
-              const activeItem = currentData[activeExplorerIndexRef.current];
-              if (activeItem) {
-                handleLoadBookingFromExplorer(activeItem);
-              }
-              return;
-            }
           }
         }
       }
@@ -3620,11 +3608,7 @@ export default function NewBooking() {
                       } else if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
                         e.preventDefault();
                         e.stopPropagation();
-                        const list = explorerDataRef.current;
-                        const activeItem = list[activeExplorerIndexRef.current];
-                        if (activeItem) {
-                          handleLoadBookingFromExplorer(activeItem);
-                        }
+                        fetchExplorerData({ search: explorerSearch, page: 1 });
                       }
                     }}
                     style={{
