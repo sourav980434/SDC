@@ -154,6 +154,8 @@ export default function NewBooking() {
   const [explorerPage, setExplorerPage] = useState(1);
   const [explorerLastPage, setExplorerLastPage] = useState(1);
   const [explorerTotal, setExplorerTotal] = useState(0);
+  const [activeExplorerIndex, setActiveExplorerIndex] = useState(0);
+  const activeExplorerRowRef = useRef(null);
 
   // Keyboard navigation & Autocomplete Index
   const [activeResultIndex, setActiveResultIndex] = useState(0);
@@ -664,27 +666,73 @@ export default function NewBooking() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close any open modal on ESC press & Handle Alt+N / Alt+L shortcuts
+  // Close any open modal on ESC press & Handle Alt+N / Alt+L shortcuts & Modal Up/Down/Enter Navigation
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
+      // 1. ESC Key: Close all modals instantly (using capture listener so even focused inputs trigger ESC!)
       if (e.key === 'Escape') {
-        setShowHistoryModal(false);
-        setShowNewPatientModal(false);
-        setShowPaymentHistoryModal(false);
-        setShowExplorerModal(false);
+        if (showExplorerModal || showHistoryModal || showNewPatientModal || showPaymentHistoryModal || showSettlementModal || showFinalInvoiceModal) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowExplorerModal(false);
+          setShowHistoryModal(false);
+          setShowNewPatientModal(false);
+          setShowPaymentHistoryModal(false);
+          setShowSettlementModal(false);
+          setShowFinalInvoiceModal(false);
+          return;
+        }
       }
+
+      // 2. Alt+N and Alt+L Shortcuts
       if (e.altKey && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault();
         handleClearForm();
+        return;
       }
       if (e.altKey && (e.key === 'l' || e.key === 'L')) {
         e.preventDefault();
         handleOpenExplorerModal();
+        return;
+      }
+
+      // 3. Up/Down Arrow & Enter Key Navigation inside Booking List Explorer Modal
+      if (showExplorerModal && explorerData.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setActiveExplorerIndex(prev => Math.min(explorerData.length - 1, prev + 1));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setActiveExplorerIndex(prev => Math.max(0, prev - 1));
+          return;
+        }
+        if (e.key === 'Enter') {
+          const targetTag = e.target ? e.target.tagName.toLowerCase() : '';
+          if (targetTag !== 'button') {
+            e.preventDefault();
+            const activeItem = explorerData[activeExplorerIndex];
+            if (activeItem) {
+              handleLoadBookingFromExplorer(activeItem);
+            }
+          }
+        }
       }
     };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, [
+    showExplorerModal,
+    showHistoryModal,
+    showNewPatientModal,
+    showPaymentHistoryModal,
+    showSettlementModal,
+    showFinalInvoiceModal,
+    explorerData,
+    activeExplorerIndex
+  ]);
   const calculateDeliveryDate = (durationDays = 0) => {
     const daysToAdd = parseInt(durationDays, 10) || 0;
     const targetDate = new Date();
@@ -942,7 +990,9 @@ export default function NewBooking() {
     fetch(url)
       .then(res => res.json())
       .then(resData => {
-        setExplorerData(resData.data || []);
+        const list = resData.data || [];
+        setExplorerData(list);
+        setActiveExplorerIndex(0);
         setExplorerSummary(resData.summary || null);
         setExplorerPage(resData.current_page || 1);
         setExplorerLastPage(resData.last_page || 1);
@@ -956,9 +1006,16 @@ export default function NewBooking() {
   };
 
   const handleOpenExplorerModal = () => {
+    setActiveExplorerIndex(0);
     setShowExplorerModal(true);
     fetchExplorerData();
   };
+
+  useEffect(() => {
+    if (showExplorerModal && activeExplorerRowRef.current) {
+      activeExplorerRowRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [activeExplorerIndex, showExplorerModal]);
 
   const handleDatePresetChange = (preset) => {
     setExplorerDatePreset(preset);
@@ -2911,13 +2968,18 @@ export default function NewBooking() {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--outline-variant)', paddingBottom: '12px' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--primary)', margin: 0 }}>Part Payment History</h3>
-              <button 
-                type="button" 
-                onClick={() => setShowPaymentHistoryModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
+                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to Close
+                </span>
+                <button 
+                  type="button" 
+                  onClick={() => setShowPaymentHistoryModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -3065,13 +3127,18 @@ export default function NewBooking() {
                   Booking No: <strong>{settlementBkNo}</strong>
                 </span>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setShowSettlementModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
+                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to Close
+                </span>
+                <button 
+                  type="button" 
+                  onClick={() => setShowSettlementModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '12px 16px', borderRadius: 'var(--radius-lg)', color: '#92400e', fontSize: '13.5px' }}>
@@ -3188,16 +3255,21 @@ export default function NewBooking() {
                   Linked Booking No: <strong>{generatedInvoiceData.bookingNo}</strong>
                 </span>
               </div>
-              <button 
-                type="button" 
-                onClick={() => {
-                  setShowFinalInvoiceModal(false);
-                  reloadCurrentBooking(savedBookingNo || bookingNo);
-                }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
+                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to Close
+                </span>
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setShowFinalInvoiceModal(false);
+                    reloadCurrentBooking(savedBookingNo || bookingNo);
+                  }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Patient Header Summary */}
@@ -3354,14 +3426,14 @@ export default function NewBooking() {
                     Booking List Explorer
                   </h3>
                   <span style={{ fontSize: '12px', color: 'var(--outline)' }}>
-                    Industrial Filter & Search Engine • Showing {explorerTotal} total bookings
+                    Showing {explorerTotal} total bookings
                   </span>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
-                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to close
+                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to Close
                 </span>
                 <button
                   type="button"
@@ -3468,7 +3540,7 @@ export default function NewBooking() {
                   <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--outline)' }} />
                   <input
                     type="text"
-                    placeholder="Search by Booking No, Patient Name, Mobile, Doctor..."
+                    placeholder="Search by Booking No, Patient Name, Mobile, Doctor... (Press ↑/↓ to navigate)"
                     value={explorerSearch}
                     onChange={(e) => {
                       setExplorerSearch(e.target.value);
@@ -3599,78 +3671,90 @@ export default function NewBooking() {
                     </tr>
                   </thead>
                   <tbody>
-                    {explorerData.map((item) => (
-                      <tr
-                        key={item.id}
-                        style={{
-                          borderBottom: '1px solid var(--outline-variant)',
-                          transition: 'background-color 0.15s'
-                        }}
-                      >
-                        <td style={{ padding: '10px 8px', fontWeight: '800', fontFamily: 'var(--font-mono)', color: 'var(--primary)' }}>
-                          {item.bookingNo}
-                        </td>
-                        <td style={{ padding: '10px 8px', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
-                          {item.dateFormatted}
-                        </td>
-                        <td style={{ padding: '10px 8px' }}>
-                          <div style={{ fontWeight: '700', color: 'var(--on-surface)' }}>
-                            {item.patientPrefix} {item.patientName}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--outline)' }}>
-                            {item.age} • {item.sex} {item.mobile ? `• Ph: ${item.mobile}` : ''}
-                          </div>
-                        </td>
-                        <td style={{ padding: '10px 8px', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
-                          {item.doctorName}
-                        </td>
-                        <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
-                          ₹ {item.netAmount.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--font-mono)', color: '#2e7d32' }}>
-                          ₹ {item.paidAmount.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '800', fontFamily: 'var(--font-mono)', color: item.dueAmount > 0 ? '#b3261e' : '#2e7d32' }}>
-                          ₹ {item.dueAmount.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                          <span style={{
-                            padding: '3px 8px',
-                            borderRadius: '12px',
-                            fontSize: '10px',
-                            fontWeight: '800',
-                            textTransform: 'uppercase',
-                            backgroundColor: item.paymentStatus === 'FULL' ? 'rgba(46, 125, 50, 0.15)' : (item.paymentStatus === 'PARTIAL' ? 'rgba(237, 108, 2, 0.15)' : 'rgba(179, 38, 30, 0.15)'),
-                            color: item.paymentStatus === 'FULL' ? '#2e7d32' : (item.paymentStatus === 'PARTIAL' ? '#ed6c02' : '#b3261e'),
-                            border: item.paymentStatus === 'FULL' ? '1px solid rgba(46, 125, 50, 0.3)' : (item.paymentStatus === 'PARTIAL' ? '1px solid rgba(237, 108, 2, 0.3)' : '1px solid rgba(179, 38, 30, 0.3)')
-                          }}>
-                            {item.paymentStatus}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleLoadBookingFromExplorer(item)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '5px 10px',
-                              borderRadius: 'var(--radius-md)',
-                              backgroundColor: 'var(--primary-container)',
-                              color: 'var(--on-primary-container)',
-                              border: 'none',
-                              fontSize: '11.5px',
-                              fontWeight: '700',
-                              cursor: 'pointer'
-                            }}
-                            title="Load booking into form for editing or payments"
-                          >
-                            <Edit3 size={13} /> Load
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {explorerData.map((item, idx) => {
+                      const isActive = idx === activeExplorerIndex;
+                      return (
+                        <tr
+                          key={item.id}
+                          ref={isActive ? activeExplorerRowRef : null}
+                          onClick={() => setActiveExplorerIndex(idx)}
+                          onDoubleClick={() => handleLoadBookingFromExplorer(item)}
+                          style={{
+                            borderBottom: '1px solid var(--outline-variant)',
+                            backgroundColor: isActive ? 'var(--primary-container)' : 'transparent',
+                            color: isActive ? 'var(--on-primary-container)' : 'inherit',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.15s'
+                          }}
+                        >
+                          <td style={{ padding: '10px 8px', fontWeight: '800', fontFamily: 'var(--font-mono)', color: isActive ? 'var(--on-primary-container)' : 'var(--primary)' }}>
+                            {item.bookingNo}
+                          </td>
+                          <td style={{ padding: '10px 8px', fontSize: '12px', color: isActive ? 'var(--on-primary-container)' : 'var(--on-surface-variant)' }}>
+                            {item.dateFormatted}
+                          </td>
+                          <td style={{ padding: '10px 8px' }}>
+                            <div style={{ fontWeight: '700', color: isActive ? 'var(--on-primary-container)' : 'var(--on-surface)' }}>
+                              {item.patientPrefix} {item.patientName}
+                            </div>
+                            <div style={{ fontSize: '11px', color: isActive ? 'var(--on-primary-container)' : 'var(--outline)', opacity: isActive ? 0.85 : 1 }}>
+                              {item.age} • {item.sex} {item.mobile ? `• Ph: ${item.mobile}` : ''}
+                            </div>
+                          </td>
+                          <td style={{ padding: '10px 8px', fontSize: '12px', color: isActive ? 'var(--on-primary-container)' : 'var(--on-surface-variant)' }}>
+                            {item.doctorName}
+                          </td>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
+                            ₹ {item.netAmount.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--font-mono)', color: isActive ? 'var(--on-primary-container)' : '#2e7d32' }}>
+                            ₹ {item.paidAmount.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '800', fontFamily: 'var(--font-mono)', color: isActive ? 'var(--on-primary-container)' : (item.dueAmount > 0 ? '#b3261e' : '#2e7d32') }}>
+                            ₹ {item.dueAmount.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                            <span style={{
+                              padding: '3px 8px',
+                              borderRadius: '12px',
+                              fontSize: '10px',
+                              fontWeight: '800',
+                              textTransform: 'uppercase',
+                              backgroundColor: isActive ? 'rgba(255, 255, 255, 0.25)' : (item.paymentStatus === 'FULL' ? 'rgba(46, 125, 50, 0.15)' : (item.paymentStatus === 'PARTIAL' ? 'rgba(237, 108, 2, 0.15)' : 'rgba(179, 38, 30, 0.15)')),
+                              color: isActive ? 'var(--on-primary-container)' : (item.paymentStatus === 'FULL' ? '#2e7d32' : (item.paymentStatus === 'PARTIAL' ? '#ed6c02' : '#b3261e')),
+                              border: isActive ? '1px solid rgba(255,255,255,0.4)' : (item.paymentStatus === 'FULL' ? '1px solid rgba(46, 125, 50, 0.3)' : (item.paymentStatus === 'PARTIAL' ? '1px solid rgba(237, 108, 2, 0.3)' : '1px solid rgba(179, 38, 30, 0.3)'))
+                            }}>
+                              {item.paymentStatus}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleLoadBookingFromExplorer(item);
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '5px 10px',
+                                borderRadius: 'var(--radius-md)',
+                                backgroundColor: isActive ? 'var(--on-primary-container)' : 'var(--primary-container)',
+                                color: isActive ? 'var(--primary-container)' : 'var(--on-primary-container)',
+                                border: 'none',
+                                fontSize: '11.5px',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                              title="Load booking into form for editing or payments (Press Enter)"
+                            >
+                              <Edit3 size={13} /> Load
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
