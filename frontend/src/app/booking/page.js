@@ -158,6 +158,7 @@ export default function NewBooking() {
   const activeExplorerRowRef = useRef(null);
   const activeExplorerIndexRef = useRef(0);
   const explorerDataRef = useRef([]);
+  const explorerSearchRef = useRef(null);
 
   useEffect(() => {
     activeExplorerIndexRef.current = activeExplorerIndex;
@@ -166,6 +167,29 @@ export default function NewBooking() {
   useEffect(() => {
     explorerDataRef.current = explorerData;
   }, [explorerData]);
+
+  // Automatic Modal Focus Trapping & Restoration Logic
+  useEffect(() => {
+    if (showExplorerModal) {
+      const timer = setTimeout(() => {
+        explorerSearchRef.current?.focus();
+        explorerSearchRef.current?.select();
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [showExplorerModal]);
+
+  useEffect(() => {
+    const isAnyModalOpen = showExplorerModal || showHistoryModal || showNewPatientModal || showPaymentHistoryModal || showSettlementModal || showFinalInvoiceModal;
+    if (!isAnyModalOpen) {
+      const timer = setTimeout(() => {
+        if (codeRef.current && (document.activeElement === document.body || !document.activeElement)) {
+          codeRef.current.focus();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [showExplorerModal, showHistoryModal, showNewPatientModal, showPaymentHistoryModal, showSettlementModal, showFinalInvoiceModal]);
 
   // Keyboard navigation & Autocomplete Index
   const [activeResultIndex, setActiveResultIndex] = useState(0);
@@ -3570,6 +3594,7 @@ export default function NewBooking() {
                 <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
                   <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--outline)' }} />
                   <input
+                    ref={explorerSearchRef}
                     type="text"
                     placeholder="Search by Booking No, Patient Name, Mobile, Doctor... (Press ↑/↓ to navigate)"
                     value={explorerSearch}
