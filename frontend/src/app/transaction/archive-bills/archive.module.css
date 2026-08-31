@@ -318,7 +318,9 @@
   border-radius: var(--radius-xl);
   width: 100%;
   max-width: 650px;
-  max-height: 90vh;
+  height: 80vh;
+  min-height: 580px;
+  max-height: 80vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 40px rgba(0,0,0,0.3);

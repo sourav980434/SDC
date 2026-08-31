@@ -3452,7 +3452,9 @@ export default function NewBooking() {
             borderRadius: 'var(--radius-xl)',
             width: '100%',
             maxWidth: '1200px',
-            maxHeight: '90vh',
+            height: '85vh',
+            minHeight: '640px',
+            maxHeight: '85vh',
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
@@ -3726,11 +3728,11 @@ export default function NewBooking() {
             {/* Industrial Table Content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
               {explorerLoading ? (
-                <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--outline)' }}>
+                <div style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'var(--outline)' }}>
                   <p style={{ fontSize: '15px', fontWeight: '700' }}>Loading Booking Explorer Data...</p>
                 </div>
               ) : explorerData.length === 0 ? (
-                <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--outline)' }}>
+                <div style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'var(--outline)' }}>
                   <p style={{ fontSize: '15px', fontWeight: '700' }}>No bookings found matching selected filters.</p>
                 </div>
               ) : (
