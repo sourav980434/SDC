@@ -1,28 +1,45 @@
 .loginWrapper {
-  min-height: 100%;
-  height: 100%;
+  min-height: 100vh;
+  width: 100vw;
   flex: 1;
-  width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  background: radial-gradient(circle at 50% 30%, #ffffff 0%, #f0f4f9 60%, #e2e8f0 100%);
+  background-size: cover;
+  background-position: center;
   font-family: var(--font-sans);
   padding: 20px;
+  position: relative;
+  overflow-y: auto;
+  perspective: 1000px;
+}
+
+.loginWrapperDark {
+  background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 70%, #020617 100%);
 }
 
 .loginCard {
-  background: rgba(30, 41, 59, 0.85);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
-  padding: 40px 36px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  padding: 36px 32px;
   width: 100%;
   max-width: 440px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 60px -15px rgba(7, 10, 97, 0.14), 0 0 1px 1px rgba(255, 255, 255, 0.8) inset;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+  transition: transform 0.15s ease-out, box-shadow 0.2s ease;
+  transform-style: preserve-3d;
+}
+
+.loginCardDark {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6);
 }
 
 .header {
@@ -30,51 +47,103 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .logoBadge {
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #070a61, #006399);
   display: flex;
   justify-content: center;
   align-items: center;
   color: #ffffff;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 10px 24px rgba(7, 10, 97, 0.25);
+  transition: all 0.3s ease;
+}
+
+/* Animations */
+.animPulse {
+  animation: logoPulse 2.5s infinite ease-in-out;
+}
+
+.animSpin {
+  animation: logoSpin 12s linear infinite;
+}
+
+.animFloat {
+  animation: logoFloat 3s ease-in-out infinite;
+}
+
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 10px 24px rgba(7, 10, 97, 0.25); }
+  50% { transform: scale(1.08); box-shadow: 0 14px 32px rgba(0, 99, 153, 0.45); }
+}
+
+@keyframes logoSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
 .title {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--primary, #070a61);
   margin: 0;
   letter-spacing: -0.3px;
+  line-height: 1.25;
 }
 
 .subtitle {
-  font-size: 13px;
-  color: #94a3b8;
+  font-size: 12px;
+  color: var(--outline, #64748b);
   margin: 0;
+  font-weight: 600;
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
 }
 
 .inputGroup {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
+}
+
+.labelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .label {
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 700;
-  color: #cbd5e1;
+  color: #1e293b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.labelDark {
+  color: #e2e8f0;
+}
+
+.capsBadge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #b91c1c;
+  background-color: #fee2e2;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .inputWrapper {
@@ -85,40 +154,74 @@
 
 .inputIcon {
   position: absolute;
-  left: 14px;
+  left: 12px;
   color: #64748b;
+  pointer-events: none;
+}
+
+.eyeBtn {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.eyeBtn:hover {
+  color: var(--primary);
 }
 
 .input {
   width: 100%;
-  padding: 12px 14px 12px 42px;
+  padding: 10px 38px 10px 38px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(15, 23, 42, 0.6);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
+  border: 1px solid #cbd5e1;
+  background: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
+  font-size: 13.5px;
+  font-weight: 600;
   outline: none;
   transition: all 0.2s ease;
 }
 
+.inputDark {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(15, 23, 42, 0.6);
+  color: #ffffff;
+}
+
 .input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
-  background: rgba(15, 23, 42, 0.8);
+  border-color: #006399;
+  box-shadow: 0 0 0 3px rgba(0, 99, 235, 0.18);
+  background: #ffffff;
+}
+
+.rememberRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .submitBtn {
-  margin-top: 6px;
-  padding: 13px;
+  margin-top: 4px;
+  padding: 12px;
   border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: linear-gradient(135deg, #070a61, #006399);
   color: #ffffff;
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 6px 20px rgba(7, 10, 97, 0.25);
   transition: all 0.2s ease;
   display: flex;
   justify-content: center;
@@ -127,17 +230,18 @@
 }
 
 .submitBtn:hover {
-  opacity: 0.94;
+  opacity: 0.95;
   transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 99, 153, 0.35);
 }
 
 .errorBanner {
-  background: rgba(225, 29, 72, 0.15);
-  border: 1px solid rgba(225, 29, 72, 0.3);
-  color: #fecdd3;
-  padding: 10px 14px;
+  background: rgba(225, 29, 72, 0.1);
+  border: 1px solid rgba(225, 29, 72, 0.25);
+  color: #9f1239;
+  padding: 9px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -145,19 +249,19 @@
 }
 
 .quickAccounts {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .quickTitle {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
 }
 
 .accountPills {
@@ -167,19 +271,19 @@
 }
 
 .pill {
-  padding: 4px 10px;
+  padding: 4px 9px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #cbd5e1;
-  font-size: 11.5px;
-  font-weight: 600;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .pill:hover {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.4);
+  background: #006399;
+  border-color: #006399;
   color: #ffffff;
 }

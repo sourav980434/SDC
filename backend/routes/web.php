@@ -2725,12 +2725,14 @@ Route::post('/api/setup/settings', function (Request $request) {
     DB::transaction(function () use ($settings) {
         foreach ($settings as $key => $val) {
             $valueToStore = is_array($val) ? json_encode($val) : $val;
-            DB::table('tbl_web_settings')
-                ->where('setting_key', $key)
-                ->update([
+            DB::table('tbl_web_settings')->updateOrInsert(
+                ['setting_key' => $key],
+                [
                     'setting_value' => $valueToStore,
+                    'setting_type' => is_array($val) ? 'json' : 'text',
                     'updated_at' => now()
-                ]);
+                ]
+            );
         }
     });
 

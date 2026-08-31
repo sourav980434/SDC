@@ -245,6 +245,94 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+
+        {/* Card 3: Login Portal & 3D Visual Customization */}
+        <div className={styles.card} style={{ gridColumn: 'span 2' }}>
+          <h3 className={styles.cardTitle}>
+            <ShieldCheck size={20} color="#0284c7" />
+            Login Screen 3D Visual Customization
+          </h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <div className={styles.formGroup}>
+                <label>Login Background Theme Preset</label>
+                <select
+                  className={styles.input}
+                  value={form.login_theme_preset || 'light_soft'}
+                  onChange={e => handleChange('login_theme_preset', e.target.value)}
+                >
+                  <option value="light_soft">Light Soft Gradient (Default Porcelain Light)</option>
+                  <option value="medical_blue">Medical Clinical Blue Gradient</option>
+                  <option value="clean_white">Clean Minimalist White</option>
+                  <option value="custom_image">Custom Background Image URL</option>
+                </select>
+              </div>
+
+              <div className={styles.formGroup} style={{ marginTop: '12px' }}>
+                <label>Custom Background Image URL</label>
+                <input
+                  type="text"
+                  placeholder="https://example.com/background.jpg"
+                  className={styles.input}
+                  value={form.login_bg_image_url || ''}
+                  onChange={e => handleChange('login_bg_image_url', e.target.value)}
+                />
+              </div>
+
+              <div className={styles.formGroup} style={{ marginTop: '12px' }}>
+                <label>Logo Animation Style</label>
+                <select
+                  className={styles.input}
+                  value={form.login_logo_animation || 'pulse'}
+                  onChange={e => handleChange('login_logo_animation', e.target.value)}
+                >
+                  <option value="pulse">Pulse Heartbeat (Medical Pulsing)</option>
+                  <option value="spin">Glowing Ring Spin</option>
+                  <option value="float">3D Floating Bounce</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Live Mini Preview Box */}
+            <div style={{
+              borderRadius: '12px',
+              padding: '16px',
+              backgroundColor: form.login_theme_preset === 'clean_white' ? '#ffffff' : (form.login_theme_preset === 'medical_blue' ? '#0f172a' : '#f0f4f9'),
+              backgroundImage: (form.login_theme_preset === 'custom_image' && form.login_bg_image_url) ? `url(${form.login_bg_image_url})` : 'none',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              border: '1px solid var(--outline-variant)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '180px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.08)'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
+                marginBottom: '8px'
+              }}>
+                <Building2 size={20} />
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: '800', color: form.login_theme_preset === 'medical_blue' ? '#ffffff' : '#0f172a' }}>
+                {form.lab_name || 'Santoshpur Diagnostic Centre'}
+              </span>
+              <span style={{ fontSize: '10px', color: form.login_theme_preset === 'medical_blue' ? '#94a3b8' : '#64748b', marginTop: '2px' }}>
+                3D Light Theme Live Preview
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
