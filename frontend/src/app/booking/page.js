@@ -17,7 +17,15 @@ import {
   X,
   Save,
   FileText,
-  ShieldAlert
+  ShieldAlert,
+  Plus,
+  ListFilter,
+  Calendar,
+  Filter,
+  RotateCcw,
+  Edit3,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import styles from './booking.module.css';
 import PermissionButton from '@/components/PermissionButton';
@@ -132,6 +140,20 @@ export default function NewBooking() {
   const [settlementDue, setSettlementDue] = useState(0);
   const [settlementCollectAmt, setSettlementCollectAmt] = useState('');
   const [settlementPayMode, setSettlementPayMode] = useState('Cash');
+
+  // Industrial Booking List Explorer Modal States
+  const [showExplorerModal, setShowExplorerModal] = useState(false);
+  const [explorerData, setExplorerData] = useState([]);
+  const [explorerSummary, setExplorerSummary] = useState(null);
+  const [explorerLoading, setExplorerLoading] = useState(false);
+  const [explorerSearch, setExplorerSearch] = useState('');
+  const [explorerDatePreset, setExplorerDatePreset] = useState('all');
+  const [explorerFromDate, setExplorerFromDate] = useState('');
+  const [explorerToDate, setExplorerToDate] = useState('');
+  const [explorerPayStatus, setExplorerPayStatus] = useState('ALL');
+  const [explorerPage, setExplorerPage] = useState(1);
+  const [explorerLastPage, setExplorerLastPage] = useState(1);
+  const [explorerTotal, setExplorerTotal] = useState(0);
 
   // Keyboard navigation & Autocomplete Index
   const [activeResultIndex, setActiveResultIndex] = useState(0);
@@ -642,17 +664,26 @@ export default function NewBooking() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close any open modal on ESC press
+  // Close any open modal on ESC press & Handle Alt+N / Alt+L shortcuts
   useEffect(() => {
-    const handleEscapeClose = (e) => {
+    const handleGlobalKeyDown = (e) => {
       if (e.key === 'Escape') {
         setShowHistoryModal(false);
         setShowNewPatientModal(false);
         setShowPaymentHistoryModal(false);
+        setShowExplorerModal(false);
+      }
+      if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        handleClearForm();
+      }
+      if (e.altKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault();
+        handleOpenExplorerModal();
       }
     };
-    window.addEventListener('keydown', handleEscapeClose);
-    return () => window.removeEventListener('keydown', handleEscapeClose);
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
   const calculateDeliveryDate = (durationDays = 0) => {
     const daysToAdd = parseInt(durationDays, 10) || 0;
@@ -891,6 +922,141 @@ export default function NewBooking() {
         console.error("Error fetching recent bookings:", err);
         setHistoryBookings([]);
         setShowHistoryModal(true);
+      });
+  };
+
+  const fetchExplorerData = (opts = {}) => {
+    setExplorerLoading(true);
+    const searchVal = opts.search !== undefined ? opts.search : explorerSearch;
+    const fromVal = opts.from_date !== undefined ? opts.from_date : explorerFromDate;
+    const toVal = opts.to_date !== undefined ? opts.to_date : explorerToDate;
+    const statusVal = opts.payment_status !== undefined ? opts.payment_status : explorerPayStatus;
+    const pageVal = opts.page !== undefined ? opts.page : explorerPage;
+
+    let url = `${API_BASE}/api/booking/explorer?page=${pageVal}&per_page=25`;
+    if (searchVal.trim()) url += `&search=${encodeURIComponent(searchVal.trim())}`;
+    if (fromVal) url += `&from_date=${encodeURIComponent(fromVal)}`;
+    if (toVal) url += `&to_date=${encodeURIComponent(toVal)}`;
+    if (statusVal && statusVal !== 'ALL') url += `&payment_status=${encodeURIComponent(statusVal)}`;
+
+    fetch(url)
+      .then(res => res.json())
+      .then(resData => {
+        setExplorerData(resData.data || []);
+        setExplorerSummary(resData.summary || null);
+        setExplorerPage(resData.current_page || 1);
+        setExplorerLastPage(resData.last_page || 1);
+        setExplorerTotal(resData.total || 0);
+        setExplorerLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching explorer bookings:", err);
+        setExplorerLoading(false);
+      });
+  };
+
+  const handleOpenExplorerModal = () => {
+    setShowExplorerModal(true);
+    fetchExplorerData();
+  };
+
+  const handleDatePresetChange = (preset) => {
+    setExplorerDatePreset(preset);
+    const today = new Date();
+    const formatDateStr = (d) => {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    let fromStr = '';
+    let toStr = '';
+
+    if (preset === 'today') {
+      fromStr = formatDateStr(today);
+      toStr = formatDateStr(today);
+    } else if (preset === 'yesterday') {
+      const yest = new Date(today);
+      yest.setDate(yest.getDate() - 1);
+      fromStr = formatDateStr(yest);
+      toStr = formatDateStr(yest);
+    } else if (preset === 'last7') {
+      const d7 = new Date(today);
+      d7.setDate(d7.getDate() - 6);
+      fromStr = formatDateStr(d7);
+      toStr = formatDateStr(today);
+    } else if (preset === 'thisMonth') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      fromStr = formatDateStr(firstDay);
+      toStr = formatDateStr(today);
+    } else if (preset === 'all') {
+      fromStr = '';
+      toStr = '';
+    }
+
+    setExplorerFromDate(fromStr);
+    setExplorerToDate(toStr);
+    fetchExplorerData({ from_date: fromStr, to_date: toStr, page: 1 });
+  };
+
+  const handleLoadBookingFromExplorer = (item) => {
+    const rawBkNo = item.bookingNo || '';
+    const serialStr = rawBkNo ? (rawBkNo.split('/').pop() || rawBkNo) : item.serialNo;
+    setShowExplorerModal(false);
+    setBookingSerial(String(serialStr).padStart(5, '0'));
+    
+    fetch(`${API_BASE}/api/booking/by-no/${serialStr}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && !data.error) {
+          lastSelectedNameRef.current = data.patientName || '';
+          lastSelectedPhoneRef.current = data.phone || '';
+          setShowPatientNameResults(false);
+          setShowPatientPhoneResults(false);
+          setPatientNameResults([]);
+          setPatientPhoneResults([]);
+          setShowDrResults(false);
+          setShowResults(false);
+
+          setPatientCode(data.patientCode || '');
+          setPrefix(data.prefix || 'Mr.');
+          setPatientName(data.patientName || '');
+          setAge(data.age || '');
+          setAgeUnit(data.ageUnit || 'Yrs');
+          setSex(data.sex || 'Male');
+          setPhone(data.phone || '');
+          setAddress(data.address || '');
+          setReferredBy(data.referredBy || '');
+          if (data.selectedDoctor) {
+            setSelectedDoctor(data.selectedDoctor);
+          }
+          const loadedTests = (data.selectedTests || []).map(t => ({
+            ...t,
+            delivery_date: t.delivery_date || calculateDeliveryDate(t.duration || 0)
+          }));
+          setSelectedTests(loadedTests);
+          setDiscountValue(data.discountValue || '');
+          setCollectionCharge(data.collectionCharge ? String(data.collectionCharge) : '');
+          setProcedureCharge(data.procedureCharge ? String(data.procedureCharge) : '');
+          setReceivedAmount('');
+          setPaymentMethod(data.paymentMethod || 'Cash');
+          setBookingNo(data.bookingNo);
+          setSavedBookingNo(data.bookingNo);
+          setPaymentsList(data.payments || []);
+
+          if (data.created_at_formatted || data.date) {
+            const formattedDate = data.created_at_formatted || (data.date ? new Date(data.date).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '');
+            const user = data.created_by_user || 'Admin';
+            setSavedBillInfo({ date: formattedDate, user: user });
+          } else {
+            setSavedBillInfo(null);
+          }
+          codeRef.current?.focus();
+        }
+      })
+      .catch(err => {
+        alert(`Error loading booking: ${err.message}`);
       });
   };
 
@@ -1354,13 +1520,77 @@ export default function NewBooking() {
     <div className={styles.pageWrapper}>
       {/* Page Title & Booking Info */}
       <section className={styles.topSection}>
-        <div>
-          <nav className={styles.breadcrumb}>
-            <span>Transaction</span>
-            <span>/</span>
-            <span className={styles.breadcrumbActive}>Booking/Advance</span>
-          </nav>
-          <h2>Pathology Diagnostic Booking</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <nav className={styles.breadcrumb}>
+              <span>Transaction</span>
+              <span>/</span>
+              <span className={styles.breadcrumbActive}>Booking/Advance</span>
+            </nav>
+            <h2 style={{ margin: 0 }}>Pathology Diagnostic Booking</h2>
+          </div>
+
+          {/* Top Header Action Bar: New Button & Booking List Button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+            <button
+              type="button"
+              onClick={handleClearForm}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 14px',
+                backgroundColor: 'var(--primary)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: '700',
+                fontSize: '13px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+                transition: 'all 0.2s ease'
+              }}
+              title="Start New Booking (Alt + N)"
+            >
+              <Plus size={16} />
+              <span>New</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenExplorerModal}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 14px',
+                backgroundColor: 'var(--surface-container-high)',
+                color: 'var(--on-surface)',
+                border: '1px solid var(--outline-variant)',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: '700',
+                fontSize: '13px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="Open Industrial Booking List Explorer (Alt + L)"
+            >
+              <ListFilter size={16} style={{ color: 'var(--primary)' }} />
+              <span>Booking List</span>
+              {explorerTotal > 0 && (
+                <span style={{
+                  padding: '1px 6px',
+                  backgroundColor: 'var(--primary-container)',
+                  color: 'var(--on-primary-container)',
+                  borderRadius: '10px',
+                  fontSize: '11px',
+                  fontWeight: '800'
+                }}>
+                  {explorerTotal}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
         <div className={styles.voucherInfo}>
           <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
@@ -3071,6 +3301,437 @@ export default function NewBooking() {
               >
                 <Printer size={16} /> Print Final Tax Invoice
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Industrial Booking List Explorer Modal */}
+      {showExplorerModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(6px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}>
+          <div style={{
+            backgroundColor: 'var(--surface-container-lowest)',
+            border: '1px solid var(--outline-variant)',
+            borderRadius: 'var(--radius-xl)',
+            width: '100%',
+            maxWidth: '1200px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 24px',
+              backgroundColor: 'var(--surface-container-low)',
+              borderBottom: '1px solid var(--outline-variant)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  padding: '8px',
+                  backgroundColor: 'var(--primary-container)',
+                  color: 'var(--on-primary-container)',
+                  borderRadius: 'var(--radius-lg)'
+                }}>
+                  <ListFilter size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: 'var(--on-surface)' }}>
+                    Booking List Explorer
+                  </h3>
+                  <span style={{ fontSize: '12px', color: 'var(--outline)' }}>
+                    Industrial Filter & Search Engine • Showing {explorerTotal} total bookings
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
+                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to close
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowExplorerModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--outline)',
+                    padding: '4px',
+                    borderRadius: '50%'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div style={{
+              padding: '16px 24px',
+              backgroundColor: 'var(--surface-container-lowest)',
+              borderBottom: '1px solid var(--outline-variant)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              {/* Row 1: Date Presets & Custom Date Pickers */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--outline)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Calendar size={14} /> Quick Date:
+                </span>
+                {[
+                  { id: 'all', label: 'All Time' },
+                  { id: 'today', label: 'Today' },
+                  { id: 'yesterday', label: 'Yesterday' },
+                  { id: 'last7', label: 'Last 7 Days' },
+                  { id: 'thisMonth', label: 'This Month' },
+                ].map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleDatePresetChange(p.id)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      border: '1px solid',
+                      borderColor: explorerDatePreset === p.id ? 'var(--primary)' : 'var(--outline-variant)',
+                      backgroundColor: explorerDatePreset === p.id ? 'var(--primary-container)' : 'var(--surface-container-low)',
+                      color: explorerDatePreset === p.id ? 'var(--on-primary-container)' : 'var(--on-surface-variant)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--outline)' }}>From:</span>
+                  <input
+                    type="date"
+                    value={explorerFromDate}
+                    onChange={(e) => {
+                      setExplorerDatePreset('custom');
+                      setExplorerFromDate(e.target.value);
+                      fetchExplorerData({ from_date: e.target.value, page: 1 });
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--outline-variant)',
+                      backgroundColor: 'var(--surface-container-low)',
+                      color: 'var(--on-surface)'
+                    }}
+                  />
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--outline)' }}>To:</span>
+                  <input
+                    type="date"
+                    value={explorerToDate}
+                    onChange={(e) => {
+                      setExplorerDatePreset('custom');
+                      setExplorerToDate(e.target.value);
+                      fetchExplorerData({ to_date: e.target.value, page: 1 });
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--outline-variant)',
+                      backgroundColor: 'var(--surface-container-low)',
+                      color: 'var(--on-surface)'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Search Box & Payment Status Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--outline)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search by Booking No, Patient Name, Mobile, Doctor..."
+                    value={explorerSearch}
+                    onChange={(e) => {
+                      setExplorerSearch(e.target.value);
+                      fetchExplorerData({ search: e.target.value, page: 1 });
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '7px 12px 7px 32px',
+                      fontSize: '13px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--outline-variant)',
+                      backgroundColor: 'var(--surface-container-low)',
+                      color: 'var(--on-surface)',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Filter size={14} style={{ color: 'var(--outline)' }} />
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--outline)' }}>Status:</span>
+                  <select
+                    value={explorerPayStatus}
+                    onChange={(e) => {
+                      setExplorerPayStatus(e.target.value);
+                      fetchExplorerData({ payment_status: e.target.value, page: 1 });
+                    }}
+                    style={{
+                      padding: '6px 10px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--outline-variant)',
+                      backgroundColor: 'var(--surface-container-low)',
+                      color: 'var(--on-surface)',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="FULL">FULL Payment</option>
+                    <option value="PARTIAL">PARTIAL Payment</option>
+                    <option value="UNPAID">UNPAID</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => fetchExplorerData({ page: 1 })}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--secondary-container)',
+                    color: 'var(--on-secondary-container)',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                  title="Refresh Explorer List"
+                >
+                  <RotateCcw size={14} /> Refresh
+                </button>
+              </div>
+
+              {/* Metric Summary Cards */}
+              {explorerSummary && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                  gap: '10px',
+                  marginTop: '4px'
+                }}>
+                  <div style={{ padding: '8px 12px', backgroundColor: 'var(--surface-container-low)', borderRadius: 'var(--radius-md)', border: '1px solid var(--outline-variant)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600' }}>TOTAL BOOKINGS</span>
+                    <h4 style={{ margin: '2px 0 0 0', fontSize: '18px', fontWeight: '800', color: 'var(--primary)' }}>
+                      {explorerSummary.totalCount}
+                    </h4>
+                  </div>
+                  <div style={{ padding: '8px 12px', backgroundColor: 'var(--surface-container-low)', borderRadius: 'var(--radius-md)', border: '1px solid var(--outline-variant)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600' }}>TOTAL NET (₹)</span>
+                    <h4 style={{ margin: '2px 0 0 0', fontSize: '18px', fontWeight: '800', color: 'var(--on-surface)' }}>
+                      ₹ {explorerSummary.totalNet.toFixed(2)}
+                    </h4>
+                  </div>
+                  <div style={{ padding: '8px 12px', backgroundColor: 'rgba(46, 125, 50, 0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(46, 125, 50, 0.2)' }}>
+                    <span style={{ fontSize: '11px', color: '#2e7d32', fontWeight: '600' }}>TOTAL COLLECTED (₹)</span>
+                    <h4 style={{ margin: '2px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#2e7d32' }}>
+                      ₹ {explorerSummary.totalPaid.toFixed(2)}
+                    </h4>
+                  </div>
+                  <div style={{ padding: '8px 12px', backgroundColor: 'rgba(179, 38, 30, 0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(179, 38, 30, 0.2)' }}>
+                    <span style={{ fontSize: '11px', color: '#b3261e', fontWeight: '600' }}>TOTAL BALANCE DUE (₹)</span>
+                    <h4 style={{ margin: '2px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#b3261e' }}>
+                      ₹ {explorerSummary.totalDue.toFixed(2)}
+                    </h4>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Industrial Table Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
+              {explorerLoading ? (
+                <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--outline)' }}>
+                  <p style={{ fontSize: '15px', fontWeight: '700' }}>Loading Booking Explorer Data...</p>
+                </div>
+              ) : explorerData.length === 0 ? (
+                <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--outline)' }}>
+                  <p style={{ fontSize: '15px', fontWeight: '700' }}>No bookings found matching selected filters.</p>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--outline-variant)', color: 'var(--outline)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '12px 8px' }}>Booking No</th>
+                      <th style={{ padding: '12px 8px' }}>Date & Time</th>
+                      <th style={{ padding: '12px 8px' }}>Patient Details</th>
+                      <th style={{ padding: '12px 8px' }}>Referred Doctor</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'right' }}>Net Amt</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'right' }}>Paid</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'right' }}>Due</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'center' }}>Status</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'center' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {explorerData.map((item) => (
+                      <tr
+                        key={item.id}
+                        style={{
+                          borderBottom: '1px solid var(--outline-variant)',
+                          transition: 'background-color 0.15s'
+                        }}
+                      >
+                        <td style={{ padding: '10px 8px', fontWeight: '800', fontFamily: 'var(--font-mono)', color: 'var(--primary)' }}>
+                          {item.bookingNo}
+                        </td>
+                        <td style={{ padding: '10px 8px', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                          {item.dateFormatted}
+                        </td>
+                        <td style={{ padding: '10px 8px' }}>
+                          <div style={{ fontWeight: '700', color: 'var(--on-surface)' }}>
+                            {item.patientPrefix} {item.patientName}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--outline)' }}>
+                            {item.age} • {item.sex} {item.mobile ? `• Ph: ${item.mobile}` : ''}
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 8px', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                          {item.doctorName}
+                        </td>
+                        <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
+                          ₹ {item.netAmount.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--font-mono)', color: '#2e7d32' }}>
+                          ₹ {item.paidAmount.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '800', fontFamily: 'var(--font-mono)', color: item.dueAmount > 0 ? '#b3261e' : '#2e7d32' }}>
+                          ₹ {item.dueAmount.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            fontSize: '10px',
+                            fontWeight: '800',
+                            textTransform: 'uppercase',
+                            backgroundColor: item.paymentStatus === 'FULL' ? 'rgba(46, 125, 50, 0.15)' : (item.paymentStatus === 'PARTIAL' ? 'rgba(237, 108, 2, 0.15)' : 'rgba(179, 38, 30, 0.15)'),
+                            color: item.paymentStatus === 'FULL' ? '#2e7d32' : (item.paymentStatus === 'PARTIAL' ? '#ed6c02' : '#b3261e'),
+                            border: item.paymentStatus === 'FULL' ? '1px solid rgba(46, 125, 50, 0.3)' : (item.paymentStatus === 'PARTIAL' ? '1px solid rgba(237, 108, 2, 0.3)' : '1px solid rgba(179, 38, 30, 0.3)')
+                          }}>
+                            {item.paymentStatus}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleLoadBookingFromExplorer(item)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '5px 10px',
+                              borderRadius: 'var(--radius-md)',
+                              backgroundColor: 'var(--primary-container)',
+                              color: 'var(--on-primary-container)',
+                              border: 'none',
+                              fontSize: '11.5px',
+                              fontWeight: '700',
+                              cursor: 'pointer'
+                            }}
+                            title="Load booking into form for editing or payments"
+                          >
+                            <Edit3 size={13} /> Load
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer / Pagination */}
+            <div style={{
+              padding: '12px 24px',
+              backgroundColor: 'var(--surface-container-low)',
+              borderTop: '1px solid var(--outline-variant)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span style={{ fontSize: '12px', color: 'var(--outline)' }}>
+                Page {explorerPage} of {explorerLastPage} (Total {explorerTotal} bookings)
+              </span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  disabled={explorerPage <= 1}
+                  onClick={() => fetchExplorerData({ page: explorerPage - 1 })}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--outline-variant)',
+                    backgroundColor: 'var(--surface-container-lowest)',
+                    cursor: explorerPage <= 1 ? 'not-allowed' : 'pointer',
+                    opacity: explorerPage <= 1 ? 0.5 : 1,
+                    fontSize: '12px',
+                    fontWeight: '700'
+                  }}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+
+                <button
+                  type="button"
+                  disabled={explorerPage >= explorerLastPage}
+                  onClick={() => fetchExplorerData({ page: explorerPage + 1 })}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--outline-variant)',
+                    backgroundColor: 'var(--surface-container-lowest)',
+                    cursor: explorerPage >= explorerLastPage ? 'not-allowed' : 'pointer',
+                    opacity: explorerPage >= explorerLastPage ? 0.5 : 1,
+                    fontSize: '12px',
+                    fontWeight: '700'
+                  }}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
             </div>
           </div>
         </div>

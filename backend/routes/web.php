@@ -1546,6 +1546,97 @@ Route::get('/api/booking/recent', function () {
     return response()->json($recent);
 });
 
+// 4.1 Industrial Booking List Explorer API (tbl_web_booking_hdr)
+Route::get('/api/booking/explorer', function (Request $request) {
+    $search = trim($request->query('search', ''));
+    $fromDate = $request->query('from_date');
+    $toDate = $request->query('to_date');
+    $payStatus = strtoupper(trim($request->query('payment_status', 'ALL')));
+    $perPage = intval($request->query('per_page', 25));
+
+    $query = DB::table('tbl_web_booking_hdr as h');
+
+    if ($search !== '') {
+        $query->where(function($q) use ($search) {
+            $q->where('h.booking_no', 'like', '%' . $search . '%')
+              ->orWhere('h.patient_name', 'like', '%' . $search . '%')
+              ->orWhere('h.mobile_no', 'like', '%' . $search . '%')
+              ->orWhere('h.doctor_name', 'like', '%' . $search . '%');
+        });
+    }
+
+    if ($fromDate) {
+        $query->whereDate('h.created_at', '>=', $fromDate);
+    }
+    if ($toDate) {
+        $query->whereDate('h.created_at', '<=', $toDate);
+    }
+
+    if ($payStatus !== 'ALL' && $payStatus !== '') {
+        $query->where('h.payment_status', $payStatus);
+    }
+
+    // Compute aggregate summary totals for matching filter set
+    $summaryQuery = clone $query;
+    $totals = $summaryQuery->selectRaw("
+        COUNT(*) as total_count,
+        COALESCE(SUM(subtotal_amount), 0) as total_subtotal,
+        COALESCE(SUM(discount_amount), 0) as total_discount,
+        COALESCE(SUM(collection_charge), 0) as total_collection,
+        COALESCE(SUM(procedure_charge), 0) as total_procedure,
+        COALESCE(SUM(net_amount), 0) as total_net,
+        COALESCE(SUM(paid_amount), 0) as total_paid,
+        COALESCE(SUM(due_amount), 0) as total_due
+    ")->first();
+
+    $paginator = $query->orderBy('h.created_at', 'desc')->paginate($perPage);
+
+    $items = collect($paginator->items())->map(function($h) {
+        $ageStr = $h->age_year ? "{$h->age_year} Yrs" : ($h->age_month ? "{$h->age_month} Mths" : ($h->age_day ? "{$h->age_day} Days" : ''));
+        return [
+            'id' => $h->id,
+            'bookingNo' => $h->booking_no,
+            'serialNo' => $h->serial_no,
+            'dateFormatted' => $h->created_at ? (new DateTime($h->created_at))->format('d-M-Y h:i A') : '',
+            'patientCode' => $h->patient_code ?? '',
+            'patientPrefix' => $h->patient_prefix ?? 'Mr.',
+            'patientName' => $h->patient_name ?? '',
+            'sex' => $h->sex ?? '',
+            'age' => $ageStr,
+            'mobile' => $h->mobile_no ?? '',
+            'address' => $h->address ?? '',
+            'doctorName' => $h->doctor_name ?? 'Dr. SELF',
+            'subtotal' => floatval($h->subtotal_amount ?? 0),
+            'discount' => floatval($h->discount_amount ?? 0),
+            'collectionCharge' => floatval($h->collection_charge ?? 0),
+            'procedureCharge' => floatval($h->procedure_charge ?? 0),
+            'netAmount' => floatval($h->net_amount ?? 0),
+            'paidAmount' => floatval($h->paid_amount ?? 0),
+            'dueAmount' => floatval($h->due_amount ?? 0),
+            'paymentStatus' => $h->payment_status ?? 'UNPAID',
+            'paymentMethod' => $h->payment_method ?? 'Cash',
+        ];
+    });
+
+    return response()->json([
+        'data' => $items,
+        'current_page' => $paginator->currentPage(),
+        'last_page' => $paginator->lastPage(),
+        'per_page' => $paginator->perPage(),
+        'total' => $paginator->total(),
+        'summary' => [
+            'totalCount' => intval($totals->total_count ?? 0),
+            'totalSubtotal' => floatval($totals->total_subtotal ?? 0),
+            'totalDiscount' => floatval($totals->total_discount ?? 0),
+            'totalCollectionCharge' => floatval($totals->total_collection ?? 0),
+            'totalProcedureCharge' => floatval($totals->total_procedure ?? 0),
+            'totalNet' => floatval($totals->total_net ?? 0),
+            'totalPaid' => floatval($totals->total_paid ?? 0),
+            'totalDue' => floatval($totals->total_due ?? 0),
+        ]
+    ]);
+});
+
 // 5. ARCHIVE BILLS APIs (Strictly Read-Only Legacy TBookingHDR Viewer)
 Route::get('/api/booking/archive', function (Request $request) {
     $search = trim($request->query('search', ''));
