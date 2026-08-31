@@ -230,11 +230,6 @@ export default function Header({ toggleSidebar }) {
             <Settings size={20} />
           </button>
         </div>
-        
-        <div className={styles.divider}></div>
-        
-        <button className={styles.logoffBtn} onClick={handleLogOff}>Log Off</button>
-        <button className={styles.exitBtn} onClick={handleLogOff}>Exit</button>
       </div>
     </header>
   );

@@ -16,14 +16,15 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  LogOut
 } from 'lucide-react';
 import styles from '../app/layout.module.css';
 
 export default function Sidebar({ isOpen }) {
   const pathname = usePathname();
   const { shortcuts } = useHotkeys();
-  const { user: activeUser, isLoaded } = useAuth();
+  const { user: activeUser, logout, isLoaded } = useAuth();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -432,6 +433,15 @@ export default function Sidebar({ isOpen }) {
                 <span className={styles.userRole}>{activeUser.role_name || activeUser.role_code}</span>
               </div>
             )}
+            <button
+              type="button"
+              onClick={() => logout()}
+              className={styles.sidebarLogoffBtn}
+              title="Log Off Session"
+            >
+              <LogOut size={14} />
+              {!isCollapsed && <span>Log Off</span>}
+            </button>
           </div>
         )}
       </div>
