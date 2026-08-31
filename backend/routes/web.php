@@ -1574,6 +1574,52 @@ Route::get('/api/booking/universal-search', function (Request $request) {
     }
 });
 
+// 3.2 Real-time Live Autocomplete Search Endpoint for Header Navbar
+Route::get('/api/booking/live-search', function (Request $request) {
+    $q = trim($request->query('query', ''));
+    if (strlen($q) < 1) {
+        return response()->json([]);
+    }
+
+    $numVal = intval(preg_replace('/[^0-9]/', '', $q));
+    $paddedSerial = ($numVal > 0 && $numVal < 100000) ? str_pad($numVal, 5, '0', STR_PAD_LEFT) : '';
+
+    $results = DB::table('tbl_web_booking_hdr as h')
+        ->where(function($builder) use ($q, $numVal, $paddedSerial) {
+            $builder->where('h.booking_no', 'like', '%' . $q . '%')
+                    ->orWhere('h.patient_name', 'like', '%' . $q . '%')
+                    ->orWhere('h.mobile_no', 'like', '%' . $q . '%')
+                    ->orWhere('h.doctor_name', 'like', '%' . $q . '%');
+            if ($numVal > 0) {
+                $builder->orWhere('h.serial_no', $numVal);
+                if ($paddedSerial !== '') {
+                    $builder->orWhere('h.booking_no', 'like', "%/$paddedSerial%");
+                }
+            }
+        })
+        ->orderBy('h.created_at', 'desc')
+        ->take(10)
+        ->get()
+        ->map(function($h) {
+            $ageStr = $h->age_year ? "{$h->age_year} Yrs" : ($h->age_month ? "{$h->age_month} Mths" : ($h->age_day ? "{$h->age_day} Days" : ''));
+            return [
+                'id' => $h->id,
+                'bookingNo' => $h->booking_no,
+                'serialNo' => $h->serial_no,
+                'patientName' => trim($h->patient_name ?? ''),
+                'patientPrefix' => trim($h->patient_prefix ?? 'Mr.'),
+                'age' => $ageStr,
+                'sex' => trim($h->sex ?? ''),
+                'mobile' => trim($h->mobile_no ?? ''),
+                'paymentStatus' => trim($h->payment_status ?? 'UNPAID'),
+                'netAmount' => floatval($h->net_amount ?? 0),
+                'dateFormatted' => $h->created_at ? (new DateTime($h->created_at))->format('d-M-Y h:i A') : ''
+            ];
+        });
+
+    return response()->json($results);
+});
+
 // 4. Get 5 Recent Bookings (From tbl_web_booking_hdr)
 Route::get('/api/booking/recent', function () {
     $recent = DB::table('tbl_web_booking_hdr')

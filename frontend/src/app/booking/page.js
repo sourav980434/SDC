@@ -171,8 +171,14 @@ export default function NewBooking() {
     explorerDataRef.current = explorerData;
   }, [explorerData]);
 
-  // Handle URL Search Query (From Top Header Search Bar)
+  // Handle URL Search Query / Direct Serial Load (From Top Header Search Bar)
   useEffect(() => {
+    const loadSerial = searchParams ? searchParams.get('loadSerial') : null;
+    if (loadSerial && loadSerial.trim()) {
+      handleLoadBookingFromExplorer({ serialNo: loadSerial.trim() });
+      return;
+    }
+
     const q = searchParams ? searchParams.get('search') : null;
     if (q && q.trim()) {
       const trimmedQuery = q.trim();
