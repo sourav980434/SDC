@@ -156,6 +156,16 @@ export default function NewBooking() {
   const [explorerTotal, setExplorerTotal] = useState(0);
   const [activeExplorerIndex, setActiveExplorerIndex] = useState(0);
   const activeExplorerRowRef = useRef(null);
+  const activeExplorerIndexRef = useRef(0);
+  const explorerDataRef = useRef([]);
+
+  useEffect(() => {
+    activeExplorerIndexRef.current = activeExplorerIndex;
+  }, [activeExplorerIndex]);
+
+  useEffect(() => {
+    explorerDataRef.current = explorerData;
+  }, [explorerData]);
 
   // Keyboard navigation & Autocomplete Index
   const [activeResultIndex, setActiveResultIndex] = useState(0);
@@ -697,24 +707,39 @@ export default function NewBooking() {
       }
 
       // 3. Up/Down Arrow & Enter Key Navigation inside Booking List Explorer Modal
-      if (showExplorerModal && explorerData.length > 0) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setActiveExplorerIndex(prev => Math.min(explorerData.length - 1, prev + 1));
-          return;
-        }
-        if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          setActiveExplorerIndex(prev => Math.max(0, prev - 1));
-          return;
-        }
-        if (e.key === 'Enter') {
-          const targetTag = e.target ? e.target.tagName.toLowerCase() : '';
-          if (targetTag !== 'button') {
+      if (showExplorerModal) {
+        const currentData = explorerDataRef.current;
+        if (currentData && currentData.length > 0) {
+          if (e.key === 'ArrowDown') {
             e.preventDefault();
-            const activeItem = explorerData[activeExplorerIndex];
-            if (activeItem) {
-              handleLoadBookingFromExplorer(activeItem);
+            e.stopPropagation();
+            setActiveExplorerIndex(prev => {
+              const nextIdx = Math.min(currentData.length - 1, prev + 1);
+              activeExplorerIndexRef.current = nextIdx;
+              return nextIdx;
+            });
+            return;
+          }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopPropagation();
+            setActiveExplorerIndex(prev => {
+              const nextIdx = Math.max(0, prev - 1);
+              activeExplorerIndexRef.current = nextIdx;
+              return nextIdx;
+            });
+            return;
+          }
+          if (e.key === 'Enter') {
+            const targetTag = e.target ? e.target.tagName.toLowerCase() : '';
+            if (targetTag !== 'button') {
+              e.preventDefault();
+              e.stopPropagation();
+              const activeItem = currentData[activeExplorerIndexRef.current];
+              if (activeItem) {
+                handleLoadBookingFromExplorer(activeItem);
+              }
+              return;
             }
           }
         }
@@ -3681,36 +3706,36 @@ export default function NewBooking() {
                           onDoubleClick={() => handleLoadBookingFromExplorer(item)}
                           style={{
                             borderBottom: '1px solid var(--outline-variant)',
-                            backgroundColor: isActive ? 'var(--primary-container)' : 'transparent',
-                            color: isActive ? 'var(--on-primary-container)' : 'inherit',
+                            backgroundColor: isActive ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
+                            borderLeft: isActive ? '4px solid var(--primary)' : '4px solid transparent',
                             cursor: 'pointer',
-                            transition: 'background-color 0.15s'
+                            transition: 'all 0.15s ease'
                           }}
                         >
-                          <td style={{ padding: '10px 8px', fontWeight: '800', fontFamily: 'var(--font-mono)', color: isActive ? 'var(--on-primary-container)' : 'var(--primary)' }}>
+                          <td style={{ padding: '10px 8px', fontWeight: '800', fontFamily: 'var(--font-mono)', color: 'var(--primary)' }}>
                             {item.bookingNo}
                           </td>
-                          <td style={{ padding: '10px 8px', fontSize: '12px', color: isActive ? 'var(--on-primary-container)' : 'var(--on-surface-variant)' }}>
+                          <td style={{ padding: '10px 8px', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
                             {item.dateFormatted}
                           </td>
                           <td style={{ padding: '10px 8px' }}>
-                            <div style={{ fontWeight: '700', color: isActive ? 'var(--on-primary-container)' : 'var(--on-surface)' }}>
+                            <div style={{ fontWeight: '700', color: 'var(--on-surface)' }}>
                               {item.patientPrefix} {item.patientName}
                             </div>
-                            <div style={{ fontSize: '11px', color: isActive ? 'var(--on-primary-container)' : 'var(--outline)', opacity: isActive ? 0.85 : 1 }}>
+                            <div style={{ fontSize: '11px', color: 'var(--outline)' }}>
                               {item.age} • {item.sex} {item.mobile ? `• Ph: ${item.mobile}` : ''}
                             </div>
                           </td>
-                          <td style={{ padding: '10px 8px', fontSize: '12px', color: isActive ? 'var(--on-primary-container)' : 'var(--on-surface-variant)' }}>
+                          <td style={{ padding: '10px 8px', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
                             {item.doctorName}
                           </td>
                           <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                             ₹ {item.netAmount.toFixed(2)}
                           </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--font-mono)', color: isActive ? 'var(--on-primary-container)' : '#2e7d32' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--font-mono)', color: '#2e7d32' }}>
                             ₹ {item.paidAmount.toFixed(2)}
                           </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '800', fontFamily: 'var(--font-mono)', color: isActive ? 'var(--on-primary-container)' : (item.dueAmount > 0 ? '#b3261e' : '#2e7d32') }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: '800', fontFamily: 'var(--font-mono)', color: item.dueAmount > 0 ? '#b3261e' : '#2e7d32' }}>
                             ₹ {item.dueAmount.toFixed(2)}
                           </td>
                           <td style={{ padding: '10px 8px', textAlign: 'center' }}>
@@ -3720,9 +3745,9 @@ export default function NewBooking() {
                               fontSize: '10px',
                               fontWeight: '800',
                               textTransform: 'uppercase',
-                              backgroundColor: isActive ? 'rgba(255, 255, 255, 0.25)' : (item.paymentStatus === 'FULL' ? 'rgba(46, 125, 50, 0.15)' : (item.paymentStatus === 'PARTIAL' ? 'rgba(237, 108, 2, 0.15)' : 'rgba(179, 38, 30, 0.15)')),
-                              color: isActive ? 'var(--on-primary-container)' : (item.paymentStatus === 'FULL' ? '#2e7d32' : (item.paymentStatus === 'PARTIAL' ? '#ed6c02' : '#b3261e')),
-                              border: isActive ? '1px solid rgba(255,255,255,0.4)' : (item.paymentStatus === 'FULL' ? '1px solid rgba(46, 125, 50, 0.3)' : (item.paymentStatus === 'PARTIAL' ? '1px solid rgba(237, 108, 2, 0.3)' : '1px solid rgba(179, 38, 30, 0.3)'))
+                              backgroundColor: item.paymentStatus === 'FULL' ? 'rgba(46, 125, 50, 0.15)' : (item.paymentStatus === 'PARTIAL' ? 'rgba(237, 108, 2, 0.15)' : 'rgba(179, 38, 30, 0.15)'),
+                              color: item.paymentStatus === 'FULL' ? '#2e7d32' : (item.paymentStatus === 'PARTIAL' ? '#ed6c02' : '#b3261e'),
+                              border: item.paymentStatus === 'FULL' ? '1px solid rgba(46, 125, 50, 0.3)' : (item.paymentStatus === 'PARTIAL' ? '1px solid rgba(237, 108, 2, 0.3)' : '1px solid rgba(179, 38, 30, 0.3)')
                             }}>
                               {item.paymentStatus}
                             </span>
@@ -3740,12 +3765,13 @@ export default function NewBooking() {
                                 gap: '4px',
                                 padding: '5px 10px',
                                 borderRadius: 'var(--radius-md)',
-                                backgroundColor: isActive ? 'var(--on-primary-container)' : 'var(--primary-container)',
-                                color: isActive ? 'var(--primary-container)' : 'var(--on-primary-container)',
+                                backgroundColor: 'var(--primary)',
+                                color: '#ffffff',
                                 border: 'none',
                                 fontSize: '11.5px',
                                 fontWeight: '700',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                boxShadow: isActive ? '0 2px 6px rgba(37, 99, 235, 0.35)' : 'none'
                               }}
                               title="Load booking into form for editing or payments (Press Enter)"
                             >
