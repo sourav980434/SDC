@@ -217,7 +217,7 @@ export default function DailyDashboard() {
                         <td className={styles.td}>
                           <span className={styles.patientName}>{b.name}</span>
                         </td>
-                        <td className={styles.td}><span className={styles.testType}>{b.tests}</span></td>
+                        <td className={styles.td}><span className={styles.testType} title={b.tests}>{b.tests}</span></td>
                         <td className={styles.td}>
                           <span className={`${styles.statusPill} ${styles.statusReady}`}>
                             {b.status}

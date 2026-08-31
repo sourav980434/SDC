@@ -220,6 +220,20 @@
   min-height: 0;
 }
 
+.tableWrapper::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.tableWrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tableWrapper::-webkit-scrollbar-thumb {
+  background: var(--outline-variant);
+  border-radius: 10px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -238,11 +252,14 @@
   position: sticky;
   top: 0;
   z-index: 1;
+  white-space: nowrap;
 }
 
 .td {
-  padding: 8px 14px;
+  padding: 7px 14px;
   border-bottom: 1px solid var(--outline-variant);
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
 .patientNameCell {
@@ -252,8 +269,9 @@
 
 .patientName {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--on-surface);
+  white-space: nowrap;
 }
 
 .patientId {
@@ -264,17 +282,23 @@
 }
 
 .testType {
-  font-size: 13.5px;
+  font-size: 12.5px;
   color: var(--on-surface);
+  white-space: nowrap;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .statusPill {
   display: inline-flex;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius-full);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .statusInProgress { background-color: rgba(0, 99, 153, 0.1); color: var(--secondary); }
@@ -297,6 +321,55 @@
 
 .actionsLink:hover {
   text-decoration: underline;
+}
+
+/* Dynamic Height Scaling Baseline for Small Height Viewports (<=850px) */
+@media (max-height: 850px) {
+  .pageWrapper {
+    gap: 8px;
+  }
+
+  .topSection h2 {
+    font-size: 17px;
+  }
+
+  .bentoGrid {
+    gap: 8px;
+  }
+
+  .bentoCard {
+    padding: 8px 12px;
+    gap: 2px;
+  }
+
+  .cardVal {
+    font-size: 20px;
+  }
+
+  .cardLabel {
+    font-size: 9.5px;
+    margin-top: 2px;
+  }
+
+  .containerHeader {
+    padding: 8px 12px;
+  }
+
+  .containerHeader h3 {
+    font-size: 13.5px;
+  }
+
+  .th, .td {
+    padding: 5px 10px;
+  }
+
+  .widgetCard, .capacityCard {
+    padding: 12px;
+  }
+
+  .capacityCard {
+    height: 120px;
+  }
 }
 
 .containerFooter {
