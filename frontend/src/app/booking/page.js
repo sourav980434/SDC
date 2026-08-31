@@ -737,24 +737,18 @@ export default function NewBooking() {
           if (e.key === 'ArrowDown') {
             e.preventDefault();
             e.stopPropagation();
-            setActiveExplorerIndex(prev => {
-              const nextIdx = Math.min(currentData.length - 1, prev + 1);
-              activeExplorerIndexRef.current = nextIdx;
-              return nextIdx;
-            });
+            const nextIdx = Math.min(currentData.length - 1, activeExplorerIndexRef.current + 1);
+            updateActiveExplorerIndex(nextIdx);
             return;
           }
           if (e.key === 'ArrowUp') {
             e.preventDefault();
             e.stopPropagation();
-            setActiveExplorerIndex(prev => {
-              const nextIdx = Math.max(0, prev - 1);
-              activeExplorerIndexRef.current = nextIdx;
-              return nextIdx;
-            });
+            const prevIdx = Math.max(0, activeExplorerIndexRef.current - 1);
+            updateActiveExplorerIndex(prevIdx);
             return;
           }
-          if (e.key === 'Enter') {
+          if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
             const targetTag = e.target ? e.target.tagName.toLowerCase() : '';
             if (targetTag !== 'button') {
               e.preventDefault();
@@ -1113,9 +1107,11 @@ export default function NewBooking() {
   };
 
   const handleLoadBookingFromExplorer = (item) => {
+    if (!item) return;
     const rawBkNo = item.bookingNo || '';
     const serialStr = rawBkNo ? (rawBkNo.split('/').pop() || rawBkNo) : item.serialNo;
     setShowExplorerModal(false);
+    if (!serialStr) return;
     setBookingSerial(String(serialStr).padStart(5, '0'));
     
     fetch(`${API_BASE}/api/booking/by-no/${serialStr}`)
@@ -1164,7 +1160,11 @@ export default function NewBooking() {
           } else {
             setSavedBillInfo(null);
           }
-          codeRef.current?.focus();
+          setTimeout(() => {
+            codeRef.current?.focus();
+          }, 80);
+        } else {
+          alert(`Could not load booking: ${data?.error || 'Booking data error'}`);
         }
       })
       .catch(err => {
@@ -3617,8 +3617,9 @@ export default function NewBooking() {
                         if (list && list.length > 0) {
                           updateActiveExplorerIndex(Math.max(0, activeExplorerIndexRef.current - 1));
                         }
-                      } else if (e.key === 'Enter') {
+                      } else if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
                         e.preventDefault();
+                        e.stopPropagation();
                         const list = explorerDataRef.current;
                         const activeItem = list[activeExplorerIndexRef.current];
                         if (activeItem) {
@@ -3758,11 +3759,15 @@ export default function NewBooking() {
                           key={item.id}
                           tabIndex={0}
                           ref={isActive ? activeExplorerRowRef : null}
-                          onClick={() => updateActiveExplorerIndex(idx)}
+                          onClick={(e) => {
+                            updateActiveExplorerIndex(idx);
+                            e.currentTarget.focus();
+                          }}
                           onDoubleClick={() => handleLoadBookingFromExplorer(item)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                            if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.keyCode === 13) {
                               e.preventDefault();
+                              e.stopPropagation();
                               handleLoadBookingFromExplorer(item);
                             }
                           }}
