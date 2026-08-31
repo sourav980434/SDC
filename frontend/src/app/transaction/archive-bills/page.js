@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Archive, 
   Search, 
@@ -29,6 +29,31 @@ export default function ArchiveBillsPage() {
   const [selectedBill, setSelectedBill] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const searchInputRef = useRef(null);
+
+  // Focus trap & restoration for detail modal
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'Escape' && showDetailModal) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowDetailModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, [showDetailModal]);
+
+  useEffect(() => {
+    if (!showDetailModal) {
+      const timer = setTimeout(() => {
+        if (searchInputRef.current && (document.activeElement === document.body || !document.activeElement)) {
+          searchInputRef.current.focus();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [showDetailModal]);
 
   const fetchArchiveBills = (pageNo = 1) => {
     setLoading(true);
@@ -332,6 +357,7 @@ export default function ArchiveBillsPage() {
           <div className={styles.inputWrapper}>
             <Search size={16} className={styles.inputIcon} />
             <input 
+              ref={searchInputRef}
               type="text"
               className={styles.filterInput}
               placeholder="Enter name, booking no (e.g. H1823), or phone..."
@@ -475,13 +501,18 @@ export default function ArchiveBillsPage() {
                 <h3>Legacy Archive Bill Details</h3>
                 <span className={styles.archiveBadgeModal}>Read-Only Archive</span>
               </div>
-              <button 
-                type="button" 
-                className={styles.btnCloseModal}
-                onClick={() => setShowDetailModal(false)}
-              >
-                <X size={18} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
+                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to Close
+                </span>
+                <button 
+                  type="button" 
+                  className={styles.btnCloseModal}
+                  onClick={() => setShowDetailModal(false)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             <div className={styles.modalBody}>

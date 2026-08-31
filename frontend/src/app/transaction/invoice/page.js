@@ -15,6 +15,31 @@ export default function InvoicePage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedInv, setSelectedInv] = useState(null);
+  const searchInputRef = React.useRef(null);
+
+  // Focus trap & restoration for invoice modal
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'Escape' && selectedInv) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedInv(null);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, [selectedInv]);
+
+  useEffect(() => {
+    if (!selectedInv) {
+      const timer = setTimeout(() => {
+        if (searchInputRef.current && (document.activeElement === document.body || !document.activeElement)) {
+          searchInputRef.current.focus();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedInv]);
 
   const fetchInvoices = (searchQuery = '') => {
     setLoading(true);
@@ -262,6 +287,7 @@ export default function InvoicePage() {
         <div className={styles.searchBox}>
           <Search size={18} className={styles.searchIcon} />
           <input
+            ref={searchInputRef}
             type="text"
             className={styles.searchInput}
             placeholder="Search by Invoice No (INV/26-27/01001), Ref Booking No, or Patient Name..."
@@ -372,13 +398,18 @@ export default function InvoicePage() {
                   </h3>
                   <span style={{ fontSize: '12px', color: 'var(--outline)', fontFamily: 'var(--font-mono)' }}>Ref Booking: {bkNo}</span>
                 </div>
-                <button 
-                  type="button" 
-                  onClick={() => setSelectedInv(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
-                >
-                  <X size={20} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
+                    Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to Close
+                  </span>
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedInv(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               <div style={{ fontSize: '13px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px', backgroundColor: 'var(--surface-container-low)', borderRadius: 'var(--radius-lg)' }}>

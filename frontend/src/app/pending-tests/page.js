@@ -56,6 +56,38 @@ export default function PendingTestRegister() {
   const searchInputRef = useRef(null);
   const listWrapperRef = useRef(null);
   const selectedRowRef = useRef(null);
+  const firstParamInputRef = useRef(null);
+
+  // Focus trap & restoration for result entry modal
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'Escape' && (entryModalOpen || reportModalOpen)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setEntryModalOpen(false);
+        setReportModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, [entryModalOpen, reportModalOpen]);
+
+  useEffect(() => {
+    if (entryModalOpen) {
+      const timer = setTimeout(() => {
+        firstParamInputRef.current?.focus();
+        firstParamInputRef.current?.select();
+      }, 80);
+      return () => clearTimeout(timer);
+    } else {
+      const timer = setTimeout(() => {
+        if (searchInputRef.current && (document.activeElement === document.body || !document.activeElement)) {
+          searchInputRef.current.focus();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [entryModalOpen]);
 
   // Auto-scroll active queue item into view inside table container
   useEffect(() => {
@@ -500,13 +532,18 @@ export default function PendingTestRegister() {
                   Test: <strong>{activeItem.testName}</strong> ({activeItem.testCode})
                 </span>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setEntryModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
+                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to Close
+                </span>
+                <button 
+                  type="button" 
+                  onClick={() => setEntryModalOpen(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Patient Header Box */}
@@ -542,7 +579,7 @@ export default function PendingTestRegister() {
                     </tr>
                   </thead>
                   <tbody>
-                    {paramList.map((p) => {
+                    {paramList.map((p, idx) => {
                       const valStr = paramValues[p.param_code] || '';
                       const flagInfo = calculateLiveFlag(p, valStr, activeItem.sex);
 
@@ -553,6 +590,7 @@ export default function PendingTestRegister() {
                           </td>
                           <td style={{ padding: '10px 14px' }}>
                             <input
+                              ref={idx === 0 ? firstParamInputRef : null}
                               type="text"
                               value={valStr}
                               onChange={(e) => handleParamValueChange(p.param_code, e.target.value)}

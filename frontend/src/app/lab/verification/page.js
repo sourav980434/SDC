@@ -18,6 +18,31 @@ export default function PathologyVerificationPage() {
 
   const listWrapperRef = useRef(null);
   const selectedRowRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  // Focus trap & restoration for verification review modal
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'Escape' && selectedItem) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedItem(null);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, [selectedItem]);
+
+  useEffect(() => {
+    if (!selectedItem) {
+      const timer = setTimeout(() => {
+        if (searchInputRef.current && (document.activeElement === document.body || !document.activeElement)) {
+          searchInputRef.current.focus();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedItem]);
 
   // Auto-scroll selected row into view inside table container
   useEffect(() => {
@@ -182,6 +207,7 @@ export default function PathologyVerificationPage() {
         <div className={styles.searchBox}>
           <Search size={18} className={styles.searchIcon} />
           <input
+            ref={searchInputRef}
             type="text"
             className={styles.searchInput}
             placeholder="Search by Booking No, Patient Name, or Test Name..."
@@ -320,13 +346,18 @@ export default function PathologyVerificationPage() {
               <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--secondary)', margin: 0 }}>
                 Pathologist Review: {selectedItem.testName}
               </h3>
-              <button 
-                type="button" 
-                onClick={() => setSelectedItem(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
+                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to Close
+                </span>
+                <button 
+                  type="button" 
+                  onClick={() => setSelectedItem(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div style={{ fontSize: '13px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px', backgroundColor: 'var(--surface-container-low)', borderRadius: 'var(--radius-lg)' }}>

@@ -14,6 +14,30 @@ export default function UserManagementPage() {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const usernameInputRef = React.useRef(null);
+
+  // Focus trap & restoration for User modal
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'Escape' && showModal) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, [showModal]);
+
+  useEffect(() => {
+    if (showModal) {
+      const timer = setTimeout(() => {
+        usernameInputRef.current?.focus();
+        usernameInputRef.current?.select();
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [showModal]);
 
   // Form State
   const [username, setUsername] = useState('');
@@ -347,13 +371,18 @@ export default function UserManagementPage() {
               <h3 style={{ fontSize: '17px', fontWeight: '800', color: 'var(--primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Shield size={18} /> {editingUser ? 'Edit System User & Access Controls' : 'Create New System User'}
               </h3>
-              <button 
-                type="button" 
-                onClick={() => setShowModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--outline)', fontWeight: '600', backgroundColor: 'var(--surface-container-high)', padding: '4px 8px', borderRadius: '6px' }}>
+                  Press <kbd style={{ fontFamily: 'var(--font-mono)' }}>ESC</kbd> to Close
+                </span>
+                <button 
+                  type="button" 
+                  onClick={() => setShowModal(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {errorMsg && (
@@ -367,6 +396,7 @@ export default function UserManagementPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--on-surface-variant)' }}>Username (Login ID)</label>
                   <input
+                    ref={usernameInputRef}
                     type="text"
                     required
                     disabled={!!editingUser}
