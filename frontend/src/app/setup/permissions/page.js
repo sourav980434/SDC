@@ -14,9 +14,12 @@ export default function PermissionMatrixPage() {
 
   const modules = [
     { key: 'booking', name: 'Booking / Advance' },
+    { key: 'invoice', name: 'Bill / Final Invoice' },
+    { key: 'archive_bills', name: 'Archive Bills (Legacy)' },
+    { key: 'sample_tracking', name: 'Sample Tracking' },
+    { key: 'result_entry', name: 'Lab Result Entry' },
     { key: 'pending_tests', name: 'Pending Test Register' },
     { key: 'verification', name: 'Lab Result Verification' },
-    { key: 'invoice', name: 'Bill / Final Invoice' },
     { key: 'masters', name: 'Master Setup' },
     { key: 'reports', name: 'Reports & Analytics' },
     { key: 'setup', name: 'User & Permission Setup' }

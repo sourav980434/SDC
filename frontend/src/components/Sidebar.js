@@ -92,7 +92,7 @@ export default function Sidebar({ isOpen }) {
   const showTransaction = isLoaded && (isAdmin || hasModule('booking') || hasModule('invoice') || hasModule('archive_bills'));
   const showSetUp = isLoaded && (isAdmin || hasModule('setup'));
   const showPrint = isLoaded && (isAdmin || hasModule('reports'));
-  const showQuery = isLoaded && (isAdmin || hasModule('reports') || hasModule('pending_tests') || hasModule('verification'));
+  const showQuery = isLoaded && (isAdmin || hasModule('reports') || hasModule('pending_tests') || hasModule('verification') || hasModule('sample_tracking') || hasModule('result_entry'));
 
   return (
     <aside className={`${styles.sidebar} ${isOpen ? styles.sidebarOpen : ''} ${isCollapsed ? styles.sidebarCollapsed : ''}`}>
@@ -361,21 +361,25 @@ export default function Sidebar({ isOpen }) {
             </button>
             {!isCollapsed && (
               <div className={`${styles.submenu} ${openMenus.query ? styles.submenuOpen : ''}`}>
-                {(isAdmin || hasModule('pending_tests') || hasModule('verification')) && (
-                  <>
-                    <Link href="/lab/sample-tracking" className={`${styles.sublink} ${pathname === '/lab/sample-tracking' ? styles.sublinkActive : ''}`}>
-                      <span>Sample Tracking</span>
-                    </Link>
-                    <Link href="/lab/result-entry" className={`${styles.sublink} ${pathname === '/lab/result-entry' ? styles.sublinkActive : ''}`}>
-                      <span>Lab Result Entry</span>
-                    </Link>
-                    <Link href="/lab/verification" className={`${styles.sublink} ${pathname === '/lab/verification' ? styles.sublinkActive : ''}`}>
-                      <span>Pathology Verification</span>
-                    </Link>
-                    <Link href="/pending-tests" className={`${styles.sublink} ${pathname === '/pending-tests' ? styles.sublinkActive : ''}`}>
-                      <span>Pending <u>T</u>est Register</span>
-                    </Link>
-                  </>
+                {(isAdmin || hasModule('sample_tracking')) && (
+                  <Link href="/lab/sample-tracking" className={`${styles.sublink} ${pathname === '/lab/sample-tracking' ? styles.sublinkActive : ''}`}>
+                    <span>Sample Tracking</span>
+                  </Link>
+                )}
+                {(isAdmin || hasModule('result_entry')) && (
+                  <Link href="/lab/result-entry" className={`${styles.sublink} ${pathname === '/lab/result-entry' ? styles.sublinkActive : ''}`}>
+                    <span>Lab Result Entry</span>
+                  </Link>
+                )}
+                {(isAdmin || hasModule('verification')) && (
+                  <Link href="/lab/verification" className={`${styles.sublink} ${pathname === '/lab/verification' ? styles.sublinkActive : ''}`}>
+                    <span>Pathology Verification</span>
+                  </Link>
+                )}
+                {(isAdmin || hasModule('pending_tests')) && (
+                  <Link href="/pending-tests" className={`${styles.sublink} ${pathname === '/pending-tests' ? styles.sublinkActive : ''}`}>
+                    <span>Pending <u>T</u>est Register</span>
+                  </Link>
                 )}
               </div>
             )}
@@ -384,14 +388,10 @@ export default function Sidebar({ isOpen }) {
             {isCollapsed && (
               <div className={styles.flyoutMenu}>
                 <div className={styles.flyoutTitle}>Report/Query</div>
-                {(isAdmin || hasModule('pending_tests') || hasModule('verification')) && (
-                  <>
-                    <Link href="/lab/sample-tracking" className={styles.flyoutLink}>Sample Tracking</Link>
-                    <Link href="/lab/result-entry" className={styles.flyoutLink}>Lab Result Entry</Link>
-                    <Link href="/lab/verification" className={styles.flyoutLink}>Pathology Verification</Link>
-                    <Link href="/pending-tests" className={styles.flyoutLink}>Pending Test Register</Link>
-                  </>
-                )}
+                {(isAdmin || hasModule('sample_tracking')) && <Link href="/lab/sample-tracking" className={styles.flyoutLink}>Sample Tracking</Link>}
+                {(isAdmin || hasModule('result_entry')) && <Link href="/lab/result-entry" className={styles.flyoutLink}>Lab Result Entry</Link>}
+                {(isAdmin || hasModule('verification')) && <Link href="/lab/verification" className={styles.flyoutLink}>Pathology Verification</Link>}
+                {(isAdmin || hasModule('pending_tests')) && <Link href="/pending-tests" className={styles.flyoutLink}>Pending Test Register</Link>}
               </div>
             )}
           </div>
