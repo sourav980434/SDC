@@ -78,14 +78,22 @@ export default function Sidebar({ isOpen }) {
 
   const isAdmin = activeUser?.role_code === 'ADMIN';
 
-  // Helper to check module permission
+  // Helper to check module permission (Integrates User Management + Role Permission Matrix)
   const hasModule = (moduleKey) => {
     if (!isLoaded || !activeUser) return false;
     if (isAdmin) return true;
 
+    // Check 1: User-assigned modules
     const userModules = activeUser.modules || [];
     const modKeys = userModules.map(m => typeof m === 'object' ? m.module_key : m);
-    return modKeys.includes(moduleKey);
+    const assignedInUserManagement = modKeys.includes(moduleKey);
+
+    // Check 2: Role Permission Matrix can_view
+    const rolePerms = activeUser.permissions || [];
+    const matchPerm = rolePerms.find(p => p.module_key === moduleKey);
+    const canViewInMatrix = matchPerm ? Number(matchPerm.can_view) === 1 : false;
+
+    return assignedInUserManagement && canViewInMatrix;
   };
 
   const showMaster = isLoaded && (isAdmin || hasModule('masters'));

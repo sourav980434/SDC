@@ -6,7 +6,11 @@ import styles from '../sample-tracking/sample.module.css';
 
 import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
+import { useActionPermission } from '@/hooks/useActionPermission';
+
 export default function LabResultEntryPage() {
+  const perms = useActionPermission('result_entry');
+
   const [queue, setQueue] = useState([]);
   const [selectedBookingNo, setSelectedBookingNo] = useState('');
   const [bookingItems, setBookingItems] = useState([]);
@@ -263,6 +267,20 @@ export default function LabResultEntryPage() {
       uniqueBookings.push(q);
     }
   });
+
+  if (perms.isLoaded && !perms.can_view) {
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ display: 'inline-flex', padding: '16px', backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '50%', marginBottom: '16px' }}>
+          <AlertTriangle size={32} />
+        </div>
+        <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#1e293b', margin: '0 0 8px 0' }}>Access Denied</h2>
+        <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '480px', margin: '0 auto 20px auto' }}>
+          You do not have permission to view the Lab Result Entry module. Please contact your administrator to grant permission in User Management & Role Permission Matrix.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.pageWrapper}>

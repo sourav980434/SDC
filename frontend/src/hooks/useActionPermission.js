@@ -8,11 +8,11 @@ import { useState, useEffect } from 'react';
  */
 export function useActionPermission(moduleKey) {
   const [permissions, setPermissions] = useState({
-    can_view: true,
-    can_add: true,
-    can_edit: true,
-    can_delete: true,
-    can_approve: true,
+    can_view: false,
+    can_add: false,
+    can_edit: false,
+    can_delete: false,
+    can_approve: false,
     isLoaded: false
   });
 
@@ -35,12 +35,19 @@ export function useActionPermission(moduleKey) {
           return;
         }
 
+        // Check 1: Is module assigned in User Management?
+        const userModules = user.modules || [];
+        const modKeys = userModules.map(m => typeof m === 'object' ? m.module_key : m);
+        const isModuleAssignedToUser = modKeys.includes(moduleKey);
+
+        // Check 2: Role Permission Matrix
         const rolePerms = user.permissions || [];
         const match = rolePerms.find(p => p.module_key === moduleKey);
         
         if (match) {
+          const matrixView = Number(match.can_view) === 1;
           setPermissions({
-            can_view: Number(match.can_view) === 1,
+            can_view: isModuleAssignedToUser && matrixView,
             can_add: Number(match.can_add) === 1,
             can_edit: Number(match.can_edit) === 1,
             can_delete: Number(match.can_delete) === 1,
@@ -54,13 +61,13 @@ export function useActionPermission(moduleKey) {
       console.error("Error reading action permissions for module:", moduleKey, e);
     }
     
-    // Default fallback while loading or if permissions matrix item not found
+    // Strict Security Fallback: Non-admin users default to FALSE (Access Denied)
     setPermissions({
-      can_view: true,
-      can_add: true,
-      can_edit: true,
-      can_delete: true,
-      can_approve: true,
+      can_view: false,
+      can_add: false,
+      can_edit: false,
+      can_delete: false,
+      can_approve: false,
       isLoaded: true
     });
   }, [moduleKey]);

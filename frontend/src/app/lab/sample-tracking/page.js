@@ -6,7 +6,11 @@ import styles from './sample.module.css';
 
 import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
+import { useActionPermission } from '@/hooks/useActionPermission';
+
 export default function SampleTrackingPage() {
+  const perms = useActionPermission('sample_tracking');
+
   const [queue, setQueue] = useState([]);
   const [search, setSearch] = useState('');
   const [sampleStatusFilter, setSampleStatusFilter] = useState('');
@@ -175,6 +179,20 @@ export default function SampleTrackingPage() {
   const collectedCount = queue.filter(q => q.sampleStatus === 'COLLECTED').length;
   const transferredCount = queue.filter(q => q.sampleStatus === 'TRANSFERRED_TO_DEPT').length;
   const verifiedCount = queue.filter(q => q.testStatus === 'VERIFIED').length;
+
+  if (perms.isLoaded && !perms.can_view) {
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ display: 'inline-flex', padding: '16px', backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '50%', marginBottom: '16px' }}>
+          <AlertCircle size={32} />
+        </div>
+        <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#1e293b', margin: '0 0 8px 0' }}>Access Denied</h2>
+        <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '480px', margin: '0 auto 20px auto' }}>
+          You do not have permission to view the Sample Tracking module. Please contact your administrator to grant permission in User Management & Role Permission Matrix.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.pageWrapper}>
