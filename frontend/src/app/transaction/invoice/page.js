@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Printer, FileText, CheckCircle, X, ShieldAlert } from 'lucide-react';
 import styles from './invoice.module.css';
 import PermissionButton from '@/components/PermissionButton';
@@ -15,7 +15,7 @@ export default function InvoicePage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedInv, setSelectedInv] = useState(null);
-  const searchInputRef = React.useRef(null);
+  const searchInputRef = useRef(null);
 
   // Focus trap & restoration for invoice modal
   useEffect(() => {

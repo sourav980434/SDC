@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './users.module.css';
 import { UserPlus, Edit3, Shield, Key, Check, X, Building2, LayoutGrid, Sparkles } from 'lucide-react';
 
@@ -14,7 +14,7 @@ export default function UserManagementPage() {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const usernameInputRef = React.useRef(null);
+  const usernameInputRef = useRef(null);
 
   // Focus trap & restoration for User modal
   useEffect(() => {
