@@ -5,6 +5,7 @@ import styles from './users.module.css';
 import { UserPlus, Edit3, Shield, Key, Check, X, Building2, LayoutGrid, Sparkles } from 'lucide-react';
 
 import API_BASE from '@/lib/apiConfig';
+import { SYSTEM_MODULES } from '@/lib/modulesConfig';
 export default function UserManagementPage() {
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -53,18 +54,7 @@ export default function UserManagementPage() {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const availableModules = [
-    { key: 'booking', name: 'Booking / Advance' },
-    { key: 'invoice', name: 'Bill / Final Invoice' },
-    { key: 'archive_bills', name: 'Archive Bills (Legacy)' },
-    { key: 'sample_tracking', name: 'Sample Tracking' },
-    { key: 'result_entry', name: 'Lab Result Entry' },
-    { key: 'pending_tests', name: 'Pending Test Register' },
-    { key: 'verification', name: 'Lab Result Verification' },
-    { key: 'masters', name: 'Master Setup' },
-    { key: 'reports', name: 'Reports & Analytics' },
-    { key: 'setup', name: 'User & Permission Setup' }
-  ];
+  const availableModules = SYSTEM_MODULES;
 
   const fetchUsers = () => {
     setLoading(true);

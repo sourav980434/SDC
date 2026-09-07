@@ -5,6 +5,7 @@ import styles from './permissions.module.css';
 import { ShieldCheck, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 
 import API_BASE from '@/lib/apiConfig';
+import { SYSTEM_MODULES } from '@/lib/modulesConfig';
 export default function PermissionMatrixPage() {
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
@@ -12,18 +13,7 @@ export default function PermissionMatrixPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  const modules = [
-    { key: 'booking', name: 'Booking / Advance' },
-    { key: 'invoice', name: 'Bill / Final Invoice' },
-    { key: 'archive_bills', name: 'Archive Bills (Legacy)' },
-    { key: 'sample_tracking', name: 'Sample Tracking' },
-    { key: 'result_entry', name: 'Lab Result Entry' },
-    { key: 'pending_tests', name: 'Pending Test Register' },
-    { key: 'verification', name: 'Lab Result Verification' },
-    { key: 'masters', name: 'Master Setup' },
-    { key: 'reports', name: 'Reports & Analytics' },
-    { key: 'setup', name: 'User & Permission Setup' }
-  ];
+  const modules = SYSTEM_MODULES;
 
   const fetchInitialData = () => {
     setLoading(true);
