@@ -22,12 +22,17 @@ export default function SetupLayout({ children }) {
     if (!activeUser) return false;
     if (activeUser.role_code === 'ADMIN') return true;
     
-    // Check if setup module is explicitly assigned
+    // Check 1: Is setup module assigned in User Management?
     const userModules = activeUser.modules || [];
     const modKeys = userModules.map(m => typeof m === 'object' ? m.module_key : m);
-    if (modKeys.includes('setup')) return true;
+    const assignedInUserManagement = modKeys.includes('setup');
 
-    return false;
+    // Check 2: Role Permission Matrix can_view
+    const rolePerms = activeUser.permissions || [];
+    const matchPerm = rolePerms.find(p => p.module_key === 'setup');
+    const canViewInMatrix = matchPerm ? Number(matchPerm.can_view) === 1 : false;
+
+    return assignedInUserManagement && canViewInMatrix;
   };
 
   return (

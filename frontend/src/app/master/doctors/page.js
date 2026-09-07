@@ -6,8 +6,12 @@ import { Search, Plus, Edit, Trash2, Save, X, LogOut } from 'lucide-react';
 import styles from '../master.module.css';
 
 import API_BASE from '@/lib/apiConfig';
+import { useActionPermission } from '@/hooks/useActionPermission';
+import { AlertTriangle } from 'lucide-react';
+
 export default function DoctorMaster() {
   const router = useRouter();
+  const perms = useActionPermission('masters');
   
   // State
   const [doctors, setDoctors] = useState([]);
@@ -247,7 +251,19 @@ export default function DoctorMaster() {
     }
   };
 
-  const isView = mode === 'view';
+  if (perms.isLoaded && !perms.can_view) {
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ display: 'inline-flex', padding: '16px', backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '50%', marginBottom: '16px' }}>
+          <AlertTriangle size={32} />
+        </div>
+        <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#1e293b', margin: '0 0 8px 0' }}>Access Denied</h2>
+        <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '480px', margin: '0 auto 20px auto' }}>
+          You do not have permission to view Master Setup. Please contact your administrator to grant permission in User Management & Role Permission Matrix.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
@@ -549,13 +565,13 @@ export default function DoctorMaster() {
         <div className={styles.actionBar}>
           {isView ? (
             <>
-              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleAddClick} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleAddClick} disabled={!perms.can_add} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <Plus size={16} /> Add
               </button>
-              <button type="button" className={`${styles.btn} ${styles.btnSecondary}`} onClick={handleModClick} style={{ display: 'flex', gap: '6px', alignItems: 'center' }} disabled={!selectedDoc}>
+              <button type="button" className={`${styles.btn} ${styles.btnSecondary}`} onClick={handleModClick} disabled={!selectedDoc || !perms.can_edit} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <Edit size={16} /> Mod
               </button>
-              <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={handleDeleteClick} style={{ display: 'flex', gap: '6px', alignItems: 'center' }} disabled={!selectedDoc}>
+              <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={handleDeleteClick} disabled={!selectedDoc || !perms.can_delete} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <Trash2 size={16} /> Del
               </button>
             </>
