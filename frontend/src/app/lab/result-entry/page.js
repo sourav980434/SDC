@@ -7,9 +7,17 @@ import styles from '../sample-tracking/sample.module.css';
 import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
 import { useActionPermission } from '@/hooks/useActionPermission';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LabResultEntryPage() {
   const perms = useActionPermission('result_entry');
+  const { user: activeUser } = useAuth();
+  const isAdmin = activeUser?.role_code === 'ADMIN';
+
+  // Clinical Department Access Filtering
+  const userDepts = activeUser?.departments || [];
+  const allowedDeptCodes = userDepts.map(d => (typeof d === 'object' ? d.dept_code : d)?.toString().trim().toUpperCase()).filter(Boolean);
+  const allowedDeptNames = userDepts.map(d => (typeof d === 'object' ? d.dept_name : '')?.toString().trim().toUpperCase()).filter(Boolean);
 
   const [queue, setQueue] = useState([]);
   const [selectedBookingNo, setSelectedBookingNo] = useState('');
