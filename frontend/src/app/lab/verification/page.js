@@ -8,8 +8,18 @@ import { useActionPermission } from '@/hooks/useActionPermission';
 
 import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
+import { useAuth } from '@/context/AuthContext';
+
 export default function PathologyVerificationPage() {
   const perms = useActionPermission('verification');
+  const { user: activeUser } = useAuth();
+  const isAdmin = activeUser?.role_code === 'ADMIN';
+
+  // Clinical Department Access Filtering
+  const userDepts = activeUser?.departments || [];
+  const allowedDeptCodes = userDepts.map(d => (typeof d === 'object' ? d.dept_code : d)?.toString().trim().toUpperCase()).filter(Boolean);
+  const allowedDeptNames = userDepts.map(d => (typeof d === 'object' ? d.dept_name : '')?.toString().trim().toUpperCase()).filter(Boolean);
+
   const [queue, setQueue] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -68,10 +78,25 @@ export default function PathologyVerificationPage() {
 
   const fetchVerificationQueue = () => {
     setLoading(true);
-    fetch(`${API_BASE}/api/sample-tracking/queue?search=${encodeURIComponent(search)}`)
+    let url = `${API_BASE}/api/sample-tracking/queue?search=${encodeURIComponent(search)}`;
+    if (!isAdmin && allowedDeptCodes.length > 0) {
+      url += `&allowed_depts=${encodeURIComponent(allowedDeptCodes.join(','))}`;
+    }
+
+    fetch(url)
       .then(res => res.json())
       .then(data => {
-        setQueue(data.value || []);
+        let qList = data.value || data || [];
+        if (!isAdmin && (allowedDeptCodes.length > 0 || allowedDeptNames.length > 0)) {
+          qList = qList.filter(item => {
+            const itemCode = (item.deptCode || '').toString().trim().toUpperCase();
+            const itemName = (item.deptName || '').toString().trim().toUpperCase();
+            const codeMatch = allowedDeptCodes.length > 0 && allowedDeptCodes.includes(itemCode);
+            const nameMatch = allowedDeptNames.length > 0 && allowedDeptNames.some(n => itemName.includes(n));
+            return codeMatch || nameMatch;
+          });
+        }
+        setQueue(qList);
         setLoading(false);
       })
       .catch(err => {

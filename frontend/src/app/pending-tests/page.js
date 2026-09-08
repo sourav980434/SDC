@@ -28,9 +28,18 @@ import { useActionPermission } from '@/hooks/useActionPermission';
 
 import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
+import { useAuth } from '@/context/AuthContext';
+
 export default function PendingTestRegister() {
   const { shortcuts, parseKeyEvent } = useHotkeys();
   const perms = useActionPermission('pending_tests');
+  const { user: activeUser } = useAuth();
+  const isAdmin = activeUser?.role_code === 'ADMIN';
+
+  // Clinical Department Access Filtering
+  const userDepts = activeUser?.departments || [];
+  const allowedDeptCodes = userDepts.map(d => (typeof d === 'object' ? d.dept_code : d)?.toString().trim().toUpperCase()).filter(Boolean);
+  const allowedDeptNames = userDepts.map(d => (typeof d === 'object' ? d.dept_name : '')?.toString().trim().toUpperCase()).filter(Boolean);
 
   const [density, setDensity] = useState('small');
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,10 +122,25 @@ export default function PendingTestRegister() {
 
   const fetchLiveQueue = () => {
     setLoading(true);
-    fetch(`${API_BASE}/api/sample-tracking/queue?search=${encodeURIComponent(searchQuery)}`)
+    let url = `${API_BASE}/api/sample-tracking/queue?search=${encodeURIComponent(searchQuery)}`;
+    if (!isAdmin && allowedDeptCodes.length > 0) {
+      url += `&allowed_depts=${encodeURIComponent(allowedDeptCodes.join(','))}`;
+    }
+
+    fetch(url)
       .then(res => res.json())
       .then(data => {
-        setQueueList(data.value || []);
+        let qList = data.value || data || [];
+        if (!isAdmin && (allowedDeptCodes.length > 0 || allowedDeptNames.length > 0)) {
+          qList = qList.filter(item => {
+            const itemCode = (item.deptCode || '').toString().trim().toUpperCase();
+            const itemName = (item.deptName || '').toString().trim().toUpperCase();
+            const codeMatch = allowedDeptCodes.length > 0 && allowedDeptCodes.includes(itemCode);
+            const nameMatch = allowedDeptNames.length > 0 && allowedDeptNames.some(n => itemName.includes(n));
+            return codeMatch || nameMatch;
+          });
+        }
+        setQueueList(qList);
         setLoading(false);
       })
       .catch(err => {
@@ -129,16 +153,7 @@ export default function PendingTestRegister() {
     fetchLiveQueue();
   }, [searchQuery]);
 
-  const [activeUser, setActiveUser] = useState(null);
 
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem('sdcp_user_session');
-      if (stored) {
-        setActiveUser(JSON.parse(stored));
-      }
-    } catch (e) {}
-  }, []);
 
   // Keyboard ArrowUp & ArrowDown list selection navigation
   useEffect(() => {

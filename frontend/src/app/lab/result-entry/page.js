@@ -52,10 +52,24 @@ export default function LabResultEntryPage() {
 
   const fetchWorklist = () => {
     setLoading(true);
-    fetch(`${API_BASE}/api/sample-tracking/queue?search=${encodeURIComponent(search)}`)
+    let url = `${API_BASE}/api/sample-tracking/queue?search=${encodeURIComponent(search)}`;
+    if (!isAdmin && allowedDeptCodes.length > 0) {
+      url += `&allowed_depts=${encodeURIComponent(allowedDeptCodes.join(','))}`;
+    }
+
+    fetch(url)
       .then(res => res.json())
       .then(data => {
-        const qList = data.value || data || [];
+        let qList = data.value || data || [];
+        if (!isAdmin && (allowedDeptCodes.length > 0 || allowedDeptNames.length > 0)) {
+          qList = qList.filter(item => {
+            const itemCode = (item.deptCode || '').toString().trim().toUpperCase();
+            const itemName = (item.deptName || '').toString().trim().toUpperCase();
+            const codeMatch = allowedDeptCodes.length > 0 && allowedDeptCodes.includes(itemCode);
+            const nameMatch = allowedDeptNames.length > 0 && allowedDeptNames.some(n => itemName.includes(n));
+            return codeMatch || nameMatch;
+          });
+        }
         setQueue(qList);
         setLoading(false);
       })

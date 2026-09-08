@@ -7,9 +7,17 @@ import styles from './sample.module.css';
 import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
 import { useActionPermission } from '@/hooks/useActionPermission';
+import { useAuth } from '@/context/AuthContext';
 
 export default function SampleTrackingPage() {
   const perms = useActionPermission('sample_tracking');
+  const { user: activeUser } = useAuth();
+  const isAdmin = activeUser?.role_code === 'ADMIN';
+
+  // Clinical Department Access Filtering
+  const userDepts = activeUser?.departments || [];
+  const allowedDeptCodes = userDepts.map(d => (typeof d === 'object' ? d.dept_code : d)?.toString().trim().toUpperCase()).filter(Boolean);
+  const allowedDeptNames = userDepts.map(d => (typeof d === 'object' ? d.dept_name : '')?.toString().trim().toUpperCase()).filter(Boolean);
 
   const [queue, setQueue] = useState([]);
   const [search, setSearch] = useState('');
@@ -75,15 +83,29 @@ export default function SampleTrackingPage() {
       }
     }
   }, [selectedItem]);
+
   const fetchQueue = (sSearch = search, sStatus = sampleStatusFilter) => {
     setLoading(true);
     let url = `${API_BASE}/api/sample-tracking/queue?search=${encodeURIComponent(sSearch)}`;
     if (sStatus) url += `&sample_status=${encodeURIComponent(sStatus)}`;
+    if (!isAdmin && allowedDeptCodes.length > 0) {
+      url += `&allowed_depts=${encodeURIComponent(allowedDeptCodes.join(','))}`;
+    }
 
     fetch(url)
       .then(res => res.json())
       .then(data => {
-        setQueue(data || []);
+        let items = data || [];
+        if (!isAdmin && (allowedDeptCodes.length > 0 || allowedDeptNames.length > 0)) {
+          items = items.filter(item => {
+            const itemCode = (item.deptCode || '').toString().trim().toUpperCase();
+            const itemName = (item.deptName || '').toString().trim().toUpperCase();
+            const codeMatch = allowedDeptCodes.length > 0 && allowedDeptCodes.includes(itemCode);
+            const nameMatch = allowedDeptNames.length > 0 && allowedDeptNames.some(n => itemName.includes(n));
+            return codeMatch || nameMatch;
+          });
+        }
+        setQueue(items);
         setLoading(false);
       })
       .catch(err => {

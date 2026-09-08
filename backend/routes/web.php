@@ -2106,6 +2106,7 @@ Route::get('/api/invoice/details', function (Request $request) {
 // 9. LIS SAMPLE TRACKING & WORKLIST APIs
 Route::get('/api/sample-tracking/queue', function (Request $request) {
     $deptCode = trim($request->query('dept_code', ''));
+    $allowedDepts = trim($request->query('allowed_depts', ''));
     $sampleStatus = trim($request->query('sample_status', ''));
     $testStatus = trim($request->query('test_status', ''));
     $search = trim($request->query('search', ''));
@@ -2114,11 +2115,25 @@ Route::get('/api/sample-tracking/queue', function (Request $request) {
         ->join('tbl_web_booking_hdr as h', 'd.booking_id', '=', 'h.id')
         ->leftJoin('MTest as t', 'd.test_code', '=', 't.Code')
         ->leftJoin('MDepartment as md', 't.DeptCode', '=', 'md.Code')
-        ->select('d.*', 'h.booking_no', 'h.patient_name', 'h.patient_prefix', 'h.mobile_no', 'h.booking_date', 'h.created_at as booking_created_at', 'md.Descr as master_dept_name');
+        ->select('d.*', 'h.booking_no', 'h.patient_name', 'h.patient_prefix', 'h.mobile_no', 'h.booking_date', 'h.created_at as booking_created_at', 'md.Descr as master_dept_name', 't.DeptCode as test_dept_code');
 
     if ($deptCode !== '') {
-        $query->where('d.dept_code', $deptCode);
+        $query->where(function($q) use ($deptCode) {
+            $q->where('d.dept_code', $deptCode)
+              ->orWhere('t.DeptCode', $deptCode)
+              ->orWhere('md.Descr', $deptCode);
+        });
     }
+
+    if ($allowedDepts !== '') {
+        $allowedList = array_map('trim', explode(',', $allowedDepts));
+        $query->where(function($q) use ($allowedList) {
+            $q->whereIn('t.DeptCode', $allowedList)
+              ->orWhereIn('d.dept_code', $allowedList)
+              ->orWhereIn('md.Descr', $allowedList);
+        });
+    }
+
     if ($sampleStatus !== '') {
         $query->where('d.sample_status', $sampleStatus);
     }
@@ -2134,8 +2149,9 @@ Route::get('/api/sample-tracking/queue', function (Request $request) {
         });
     }
 
-    $queue = $query->orderBy('d.id', 'desc')->take(50)->get()->map(function($item) {
+    $queue = $query->orderBy('d.id', 'desc')->take(100)->get()->map(function($item) {
         $dept = !empty($item->master_dept_name) ? trim($item->master_dept_name) : (!empty($item->dept_name) ? trim($item->dept_name) : 'UNKNOWN');
+        $deptCodeVal = !empty($item->test_dept_code) ? trim($item->test_dept_code) : (!empty($item->dept_code) ? trim($item->dept_code) : '');
         return [
             'id' => $item->id,
             'booking_id' => $item->booking_id,
@@ -2144,6 +2160,7 @@ Route::get('/api/sample-tracking/queue', function (Request $request) {
             'phone' => $item->mobile_no,
             'testCode' => $item->test_code,
             'testName' => $item->test_name,
+            'deptCode' => $deptCodeVal,
             'deptName' => $dept,
             'sampleStatus' => $item->sample_status ?? 'PENDING',
             'sampleCollectedAt' => !empty($item->sample_collected_at) ? (new DateTime($item->sample_collected_at))->format('d-M h:i A') : null,
