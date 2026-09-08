@@ -213,10 +213,8 @@ export default function DailyDashboard() {
                   <tbody>
                     {readyForDispatch.map((b) => (
                       <tr key={b.regId}>
-                        <td className={styles.td} style={{ fontWeight: '700', fontFamily: 'var(--font-mono)' }}>{b.regId}</td>
-                        <td className={styles.td}>
-                          <span className={styles.patientName}>{b.name}</span>
-                        </td>
+                        <td className={styles.td}><span className={styles.regId}>{b.regId}</span></td>
+                        <td className={styles.td}><span className={styles.patientName}>{b.name}</span></td>
                         <td className={styles.td}><span className={styles.testType} title={b.tests}>{b.tests}</span></td>
                         <td className={styles.td}>
                           <span className={`${styles.statusPill} ${styles.statusReady}`}>
@@ -356,9 +354,9 @@ export default function DailyDashboard() {
                   <tbody>
                     {readyForDispatch.map((r) => (
                       <tr key={r.regId}>
-                        <td className={styles.td} style={{ fontWeight: '700', fontFamily: 'var(--font-mono)' }}>{r.regId}</td>
-                        <td className={styles.td} style={{ fontWeight: '700', color: 'var(--primary)' }}>{r.name}</td>
-                        <td className={styles.td}>{r.tests}</td>
+                        <td className={styles.td}><span className={styles.regId}>{r.regId}</span></td>
+                        <td className={styles.td}><span className={styles.patientName}>{r.name}</span></td>
+                        <td className={styles.td}><span className={styles.testType} title={r.tests}>{r.tests}</span></td>
                         <td className={styles.td} style={{ textAlign: 'right' }}>
                           <button className={styles.actionsLink} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                             <Printer size={14} /> Print Hardcopy
@@ -500,8 +498,8 @@ export default function DailyDashboard() {
                   <tbody>
                     {panicValues.map((pv) => (
                       <tr key={pv.id}>
-                        <td className={styles.td} style={{ fontWeight: '700', color: 'var(--primary)' }}>{pv.patient}</td>
-                        <td className={styles.td}>{pv.test}</td>
+                        <td className={styles.td}><span className={styles.patientName}>{pv.patient}</span></td>
+                        <td className={styles.td}><span className={styles.testType}>{pv.test}</span></td>
                         <td className={styles.td} style={{ fontWeight: '800', color: '#dc2626', fontFamily: 'var(--font-mono)' }}>{pv.value}</td>
                         <td className={styles.td}>
                           <span className={styles.statusPill} style={{ backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' }}>

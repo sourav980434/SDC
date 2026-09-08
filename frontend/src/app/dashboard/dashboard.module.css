@@ -67,6 +67,18 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 1200px) {
+  .bentoGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .bentoGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .bentoCard {
   background-color: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
@@ -238,11 +250,12 @@
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  table-layout: auto;
 }
 
 .th {
-  padding: 8px 12px;
-  font-size: 10px;
+  padding: clamp(6px, 0.5vw, 9px) clamp(8px, 0.8vw, 12px);
+  font-size: clamp(9.5px, 0.65vw, 11px);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -256,9 +269,20 @@
 }
 
 .td {
-  padding: 6px 12px;
+  padding: clamp(5px, 0.45vw, 8px) clamp(8px, 0.8vw, 12px);
   border-bottom: 1px solid var(--outline-variant);
   line-height: 1.35;
+  font-size: clamp(11px, 0.75vw, 12.5px);
+  color: var(--on-surface);
+  vertical-align: middle;
+}
+
+.regId {
+  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: clamp(10.5px, 0.7vw, 12px);
+  color: var(--primary);
+  white-space: nowrap;
 }
 
 .patientNameCell {
@@ -268,23 +292,25 @@
 
 .patientName {
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: clamp(11px, 0.8vw, 12.5px);
   color: var(--on-surface);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .patientId {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: clamp(9.5px, 0.65vw, 10.5px);
   color: var(--outline);
   margin-top: 2px;
 }
 
 .testType {
-  font-size: 11.5px;
-  color: var(--on-surface);
+  font-size: clamp(10.5px, 0.75vw, 12px);
+  color: var(--on-surface-variant);
   line-height: 1.35;
   word-break: break-word;
+  overflow-wrap: anywhere;
   font-weight: 500;
 }
 
@@ -292,7 +318,7 @@
   display: inline-flex;
   padding: 3px 8px;
   border-radius: var(--radius-full);
-  font-size: 10px;
+  font-size: clamp(9px, 0.6vw, 10.5px);
   font-weight: 700;
   text-transform: uppercase;
   white-space: nowrap;
@@ -303,17 +329,18 @@
 .statusReady { background-color: rgba(22, 163, 74, 0.1); color: #16a34a; }
 
 .labText {
-  font-size: 13.5px;
+  font-size: clamp(11.5px, 0.85vw, 13.5px);
   color: var(--on-surface-variant);
 }
 
 .actionsLink {
   color: var(--secondary);
   font-weight: 600;
-  font-size: 13px;
+  font-size: clamp(11.5px, 0.8vw, 13px);
   background: transparent;
   border: none;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .actionsLink:hover {
