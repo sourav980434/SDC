@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useHotkeys } from '../context/HotkeyContext';
+import { ShortcutLabel, formatShortcut, flashShortcut } from './ShortcutLabel';
 import { useAuth } from '../context/AuthContext';
 import {
+  LayoutDashboard,
   Database,
   ReceiptText,
   Settings,
@@ -21,12 +23,104 @@ import {
 } from 'lucide-react';
 import styles from '../app/layout.module.css';
 
+/**
+ * Sidebar menu definition (single source for the expanded menu and the collapsed flyouts).
+ *
+ * Keyboard: press a group shortcut (e.g. Alt+M) to open that menu, then the item's underlined letter.
+ * - shortcutId:     DEFAULT_SHORTCUTS action that opens the group (context/HotkeyContext.js)
+ * - isActivePath:   highlights the group header for matching routes
+ * - letter:         accelerator inside the open group — must be unique within the group and present in the label
+ * - module:         permission module key (shown when isAdmin || hasModule(module)); omitted = visible with the group
+ * - globalShortcut: direct app-wide shortcut already mapped to this page (used as its flash target id)
+ * - badge:          { text, className } using layout.module.css badge classes
+ * - comingSoon:     placeholder item (no navigation, no letter)
+ */
+const MENU_GROUPS = [
+  {
+    id: 'master',
+    label: 'Master',
+    icon: Database,
+    shortcutId: 'MENU_MASTER',
+    isActivePath: (p) => p.startsWith('/master/'),
+    items: [
+      { href: '/master/doctors', label: 'Doctor List', letter: 'd' },
+      { href: '/master/tests', label: 'Test Rate List', letter: 't' },
+      { href: '/master/categories', label: 'Category List', letter: 'c' },
+      { href: '/master/patients', label: 'Patient List', letter: 'p' },
+      { href: '/master/departments', label: 'Department Details', letter: 'e' },
+      { href: '/master/subdepartments', label: 'Sub Department', letter: 's' },
+      { href: '/master/marketing-executives', label: 'Marketing Executive', letter: 'm' },
+      { href: '/master/collectors', label: 'Collector Details', letter: 'l' },
+    ],
+  },
+  {
+    id: 'transaction',
+    label: 'Transaction',
+    icon: ReceiptText,
+    shortcutId: 'MENU_TRANSACTION',
+    isActivePath: (p) => p.startsWith('/booking') || p.startsWith('/transaction/'),
+    items: [
+      { href: '/booking', label: 'Booking / Advance', letter: 'b', module: 'booking', globalShortcut: 'GOTO_BOOKING' },
+      { href: '/transaction/archive-bills', label: 'Archive Bills', letter: 'a', module: 'archive_bills', badge: { text: 'Legacy', className: 'legacyBadge' } },
+      { href: '/transaction/invoice', label: 'Bill / Invoice', letter: 'i', module: 'invoice' },
+    ],
+  },
+  {
+    id: 'setup',
+    label: 'SetUp',
+    icon: Settings,
+    shortcutId: 'MENU_SETUP',
+    isActivePath: (p) => p.startsWith('/setup/') || p === '/shortcuts',
+    items: [
+      { href: '/setup/settings', label: 'Lab & Report Settings', letter: 'l', badge: { text: 'Admin', className: 'adminBadge' } },
+      { href: '/setup/users', label: 'User Management', letter: 'u', badge: { text: 'Admin', className: 'adminBadge' } },
+      { href: '/setup/permissions', label: 'Permission Matrix', letter: 'p', badge: { text: 'Admin', className: 'adminBadge' } },
+      { href: '/setup/audit-trail', label: 'System Audit Trail', letter: 'a', badge: { text: 'Admin', className: 'adminBadge' } },
+      { href: '/shortcuts', label: 'Configure Shortcuts', letter: 'c', badge: { text: 'Admin', className: 'adminBadge' } },
+    ],
+  },
+  {
+    id: 'print',
+    label: 'Report Print',
+    icon: Printer,
+    shortcutId: 'MENU_PRINT',
+    isActivePath: () => false,
+    items: [
+      { label: 'Doctor List', comingSoon: true },
+      { label: 'Sale - Before Bill', comingSoon: true },
+      { label: 'Sale - After Bill', comingSoon: true },
+      { label: 'Collector Register', comingSoon: true },
+    ],
+  },
+  {
+    id: 'query',
+    label: 'Report/Query',
+    icon: BarChart3,
+    shortcutId: 'MENU_QUERY',
+    isActivePath: (p) => p.startsWith('/pending-tests') || p.startsWith('/lab/'),
+    items: [
+      { href: '/lab/sample-tracking', label: 'Sample Tracking', letter: 's', module: 'sample_tracking' },
+      { href: '/lab/result-entry', label: 'Lab Result Entry', letter: 'r', module: 'result_entry' },
+      { href: '/lab/verification', label: 'Pathology Verification', letter: 'v', module: 'verification' },
+      { href: '/pending-tests', label: 'Pending Test Register', letter: 't', module: 'pending_tests', globalShortcut: 'GOTO_PENDING' },
+    ],
+  },
+];
+
+const CLOSED_MENUS = { master: false, transaction: false, setup: false, print: false, query: false };
+
+// Flash target id for a menu item (reuses the global shortcut id when the page has one)
+const itemShortcutId = (item) => item.globalShortcut || `MENU_ITEM:${item.href}`;
+
 export default function Sidebar({ isOpen }) {
   const pathname = usePathname();
-  const { shortcuts } = useHotkeys();
+  const router = useRouter();
+  const { shortcuts, parseKeyEvent } = useHotkeys();
   const { user: activeUser, logout, isLoaded } = useAuth();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // Group waiting for an item letter after its menu shortcut was pressed (null = not in letter mode)
+  const [keyMenu, setKeyMenu] = useState(null);
 
   useEffect(() => {
     try {
@@ -56,24 +150,28 @@ export default function Sidebar({ isOpen }) {
     query: pathname === '/pending-tests' || pathname.startsWith('/lab/')
   });
 
-  const toggleMenu = (menu) => {
+  const expandSidebar = () => {
     if (isCollapsed) {
       setIsCollapsed(false);
       localStorage.setItem('sdcp_sidebar_collapsed', 'false');
     }
+  };
+
+  const toggleMenu = (menu) => {
+    expandSidebar();
     setOpenMenus((prev) => {
-      const nextState = {
-        master: false,
-        transaction: false,
-        setup: false,
-        print: false,
-        query: false
-      };
+      const nextState = { ...CLOSED_MENUS };
       if (!prev[menu]) {
         nextState[menu] = true;
       }
       return nextState;
     });
+  };
+
+  // Keyboard: always open (never toggle closed) the requested menu
+  const openMenuExclusive = (menu) => {
+    expandSidebar();
+    setOpenMenus({ ...CLOSED_MENUS, [menu]: true });
   };
 
   const isAdmin = activeUser?.role_code === 'ADMIN';
@@ -96,16 +194,84 @@ export default function Sidebar({ isOpen }) {
     return assignedInUserManagement && canViewInMatrix;
   };
 
-  const showMaster = isLoaded && (isAdmin || hasModule('masters'));
-  const showTransaction = isLoaded && (isAdmin || hasModule('booking') || hasModule('invoice') || hasModule('archive_bills'));
-  const showSetUp = isLoaded && (isAdmin || hasModule('setup'));
-  const showPrint = isLoaded && (isAdmin || hasModule('reports'));
-  const showQuery = isLoaded && (isAdmin || hasModule('reports') || hasModule('pending_tests') || hasModule('verification') || hasModule('sample_tracking') || hasModule('result_entry'));
+  const groupVisible = {
+    master: isLoaded && (isAdmin || hasModule('masters')),
+    transaction: isLoaded && (isAdmin || hasModule('booking') || hasModule('invoice') || hasModule('archive_bills')),
+    setup: isLoaded && (isAdmin || hasModule('setup')),
+    print: isLoaded && (isAdmin || hasModule('reports')),
+    query: isLoaded && (isAdmin || hasModule('reports') || hasModule('pending_tests') || hasModule('verification') || hasModule('sample_tracking') || hasModule('result_entry')),
+  };
+
+  const visibleItems = (group) => group.items.filter(item => !item.module || isAdmin || hasModule(item.module));
+
+  // Leave letter mode when the page changes or the user clicks anywhere
+  useEffect(() => {
+    setKeyMenu(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!keyMenu) return;
+    const cancel = () => setKeyMenu(null);
+    document.addEventListener('mousedown', cancel);
+    return () => document.removeEventListener('mousedown', cancel);
+  }, [keyMenu]);
+
+  // Menu keyboard accelerators (capture phase, so a letter is not typed into a focused input).
+  // Re-registered every render to always see current permissions, shortcuts and letter mode.
+  useEffect(() => {
+    const handleMenuKeys = (e) => {
+      if (!e || !e.key) return;
+      // Leave the keyboard to an open dialog (e.g. AlertDialog)
+      if (document.querySelector('[role="alertdialog"]')) return;
+
+      const combo = parseKeyEvent(e);
+      const group = MENU_GROUPS.find(g => groupVisible[g.id] && shortcuts[g.shortcutId] && combo === shortcuts[g.shortcutId].key);
+      if (group) {
+        e.preventDefault();
+        e.stopPropagation();
+        flashShortcut(group.shortcutId);
+        openMenuExclusive(group.id);
+        setKeyMenu(group.id);
+        return;
+      }
+
+      if (!keyMenu) return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setKeyMenu(null);
+        return;
+      }
+
+      // Only a plain single character selects an item; Tab, arrows and modifier combos stay with the page
+      if (e.ctrlKey || e.altKey || e.metaKey || e.key.length !== 1) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      const activeGroup = MENU_GROUPS.find(g => g.id === keyMenu);
+      const item = activeGroup && visibleItems(activeGroup).find(i => !i.comingSoon && i.letter === e.key.toLowerCase());
+      if (item) {
+        flashShortcut(itemShortcutId(item));
+        setKeyMenu(null);
+        router.push(item.href);
+      }
+    };
+
+    window.addEventListener('keydown', handleMenuKeys, true);
+    return () => window.removeEventListener('keydown', handleMenuKeys, true);
+  });
 
   return (
     <aside className={`${styles.sidebar} ${isOpen ? styles.sidebarOpen : ''} ${isCollapsed ? styles.sidebarCollapsed : ''}`}>
       {/* Sidebar Header Brand */}
-      <Link href="/dashboard" className={styles.sidebarHeader} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <Link
+        href="/dashboard"
+        className={styles.sidebarHeader}
+        style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}
+        data-shortcut="GOTO_DASHBOARD"
+        title={`Dashboard (${formatShortcut(shortcuts.GOTO_DASHBOARD.key)})`}
+      >
         <div className={styles.brandBadge}>
           <ShieldCheck size={20} color="#ffffff" />
         </div>
@@ -118,292 +284,106 @@ export default function Sidebar({ isOpen }) {
       </Link>
 
       <nav className={styles.sidebarNav}>
-        {/* Master */}
-        {showMaster && (
+        {/* Dashboard: direct link (no submenu), Alt+D */}
+        {isLoaded && (
           <div className={styles.navGroup}>
-            <button
-              className={`${styles.navHeader} ${openMenus.master || pathname.startsWith('/master/') ? styles.navHeaderActive : ''}`}
-              onClick={() => toggleMenu('master')}
-              title={isCollapsed ? "Master" : ""}
+            <Link
+              href="/dashboard"
+              className={`${styles.navHeader} ${pathname === '/dashboard' ? styles.navHeaderActive : ''}`}
+              title={`Dashboard (${formatShortcut(shortcuts.GOTO_DASHBOARD.key)})`}
+              aria-keyshortcuts={formatShortcut(shortcuts.GOTO_DASHBOARD.key).replace(/ /g, '')}
+              aria-current={pathname === '/dashboard' ? 'page' : undefined}
             >
-              <div className={styles.navHeaderContent}>
-                <Database size={19} className={styles.navIcon} />
-                {!isCollapsed && <span>Master</span>}
+              {/* data-shortcut on the inner element: its className never changes, so the flash is not cut */}
+              <div className={styles.navHeaderContent} data-shortcut="GOTO_DASHBOARD">
+                <LayoutDashboard size={19} className={styles.navIcon} />
+                {!isCollapsed && <span><ShortcutLabel text="Dashboard" combo={shortcuts.GOTO_DASHBOARD.key} /></span>}
               </div>
-              {!isCollapsed && (
-                <ChevronDown
-                  size={15}
-                  className={`${styles.chevronIcon} ${openMenus.master ? styles.chevronIconRotated : ''}`}
-                />
-              )}
-            </button>
-            
-            {/* Inline Submenu (Expanded Mode) */}
-            {!isCollapsed && (
-              <div className={`${styles.submenu} ${openMenus.master ? styles.submenuOpen : ''}`}>
-                <Link href="/master/doctors" className={`${styles.sublink} ${pathname === '/master/doctors' ? styles.sublinkActive : ''}`}>
-                  Doctor List
-                </Link>
-                <Link href="/master/tests" className={`${styles.sublink} ${pathname === '/master/tests' ? styles.sublinkActive : ''}`}>
-                  Test Rate List
-                </Link>
-                <Link href="/master/categories" className={`${styles.sublink} ${pathname === '/master/categories' ? styles.sublinkActive : ''}`}>
-                  Category List
-                </Link>
-                <Link href="/master/patients" className={`${styles.sublink} ${pathname === '/master/patients' ? styles.sublinkActive : ''}`}>
-                  Patient List
-                </Link>
-                <Link href="/master/departments" className={`${styles.sublink} ${pathname === '/master/departments' ? styles.sublinkActive : ''}`}>
-                  Department Details
-                </Link>
-                <Link href="/master/subdepartments" className={`${styles.sublink} ${pathname === '/master/subdepartments' ? styles.sublinkActive : ''}`}>
-                  Sub Department
-                </Link>
-                <Link href="/master/marketing-executives" className={`${styles.sublink} ${pathname === '/master/marketing-executives' ? styles.sublinkActive : ''}`}>
-                  Marketing Executive
-                </Link>
-                <Link href="/master/collectors" className={`${styles.sublink} ${pathname === '/master/collectors' ? styles.sublinkActive : ''}`}>
-                  Collector Details
-                </Link>
-              </div>
-            )}
-
-            {/* Flyout Submenu (Collapsed Mode Hover) */}
-            {isCollapsed && (
-              <div className={styles.flyoutMenu}>
-                <div className={styles.flyoutTitle}>Master</div>
-                <Link href="/master/doctors" className={styles.flyoutLink}>Doctor List</Link>
-                <Link href="/master/tests" className={styles.flyoutLink}>Test Rate List</Link>
-                <Link href="/master/categories" className={styles.flyoutLink}>Category List</Link>
-                <Link href="/master/patients" className={styles.flyoutLink}>Patient List</Link>
-                <Link href="/master/departments" className={styles.flyoutLink}>Department Details</Link>
-                <Link href="/master/subdepartments" className={styles.flyoutLink}>Sub Department</Link>
-                <Link href="/master/marketing-executives" className={styles.flyoutLink}>Marketing Executive</Link>
-                <Link href="/master/collectors" className={styles.flyoutLink}>Collector Details</Link>
-              </div>
-            )}
+            </Link>
           </div>
         )}
 
-        {/* Transaction */}
-        {showTransaction && (
-          <div className={styles.navGroup}>
-            <button
-              className={`${styles.navHeader} ${openMenus.transaction || pathname.startsWith('/booking') || pathname.startsWith('/transaction/') ? styles.navHeaderActive : ''}`}
-              onClick={() => toggleMenu('transaction')}
-              title={isCollapsed ? "Transaction" : ""}
-            >
-              <div className={styles.navHeaderContent}>
-                <ReceiptText size={19} className={styles.navIcon} />
-                {!isCollapsed && <span>Transaction</span>}
-              </div>
+        {MENU_GROUPS.map((group) => {
+          if (!groupVisible[group.id]) return null;
+
+          const Icon = group.icon;
+          const items = visibleItems(group);
+          const isMenuOpen = openMenus[group.id];
+          const groupCombo = shortcuts[group.shortcutId]?.key || '';
+          const groupKeys = formatShortcut(groupCombo);
+          const inKeyMode = keyMenu === group.id;
+
+          return (
+            <div key={group.id} className={styles.navGroup}>
+              <button
+                className={`${styles.navHeader} ${isMenuOpen || group.isActivePath(pathname) ? styles.navHeaderActive : ''}`}
+                onClick={() => toggleMenu(group.id)}
+                title={groupKeys ? `${group.label} (${groupKeys}, then the underlined letter)` : group.label}
+                aria-keyshortcuts={groupKeys.replace(/ /g, '') || undefined}
+                aria-expanded={!isCollapsed && !!isMenuOpen}
+              >
+                {/* data-shortcut sits on this inner element: its className never changes, so the flash is not cut */}
+                <div className={styles.navHeaderContent} data-shortcut={group.shortcutId}>
+                  <Icon size={19} className={styles.navIcon} />
+                  {!isCollapsed && <span><ShortcutLabel text={group.label} combo={groupCombo} /></span>}
+                </div>
+                {!isCollapsed && (
+                  <ChevronDown
+                    size={15}
+                    className={`${styles.chevronIcon} ${isMenuOpen ? styles.chevronIconRotated : ''}`}
+                  />
+                )}
+              </button>
+
+              {/* Inline Submenu (Expanded Mode) */}
               {!isCollapsed && (
-                <ChevronDown
-                  size={15}
-                  className={`${styles.chevronIcon} ${openMenus.transaction ? styles.chevronIconRotated : ''}`}
-                />
+                <div className={`${styles.submenu} ${isMenuOpen ? styles.submenuOpen : ''} ${inKeyMode ? styles.submenuKeyMode : ''}`}>
+                  {inKeyMode && (
+                    <div className={styles.keyModeHint}>Press the underlined letter · Esc to cancel</div>
+                  )}
+                  {items.map((item) =>
+                    item.comingSoon ? (
+                      <a key={item.label} className={styles.sublink} href="#" onClick={e => e.preventDefault()}>
+                        <span>{item.label}</span>
+                        <span className={styles.legacyBadge}>Coming Soon</span>
+                      </a>
+                    ) : (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`${styles.sublink} ${pathname === item.href ? styles.sublinkActive : ''}`}
+                        title={groupKeys ? `${item.label} (${groupKeys}, then ${item.letter.toUpperCase()})` : item.label}
+                      >
+                        <span data-shortcut={itemShortcutId(item)}>
+                          <ShortcutLabel text={item.label} letter={item.letter} />
+                        </span>
+                        {item.badge && <span className={styles[item.badge.className]}>{item.badge.text}</span>}
+                      </Link>
+                    )
+                  )}
+                </div>
               )}
-            </button>
-            {!isCollapsed && (
-              <div className={`${styles.submenu} ${openMenus.transaction ? styles.submenuOpen : ''}`}>
-                {(isAdmin || hasModule('booking')) && (
-                  <Link href="/booking" className={`${styles.sublink} ${pathname === '/booking' ? styles.sublinkActive : ''}`}>
-                    <span><u>B</u>ooking / Advance</span>
-                  </Link>
-                )}
-                {(isAdmin || hasModule('archive_bills')) && (
-                  <Link href="/transaction/archive-bills" className={`${styles.sublink} ${pathname === '/transaction/archive-bills' ? styles.sublinkActive : ''}`}>
-                    <span>Archive Bills</span>
-                    <span className={styles.legacyBadge}>Legacy</span>
-                  </Link>
-                )}
-                {(isAdmin || hasModule('invoice')) && (
-                  <Link href="/transaction/invoice" className={`${styles.sublink} ${pathname === '/transaction/invoice' ? styles.sublinkActive : ''}`}>
-                    <span>Bill / Invoice</span>
-                  </Link>
-                )}
-              </div>
-            )}
 
-            {/* Flyout Submenu (Collapsed Mode) */}
-            {isCollapsed && (
-              <div className={styles.flyoutMenu}>
-                <div className={styles.flyoutTitle}>Transaction</div>
-                {(isAdmin || hasModule('booking')) && <Link href="/booking" className={styles.flyoutLink}>Booking / Advance</Link>}
-                {(isAdmin || hasModule('archive_bills')) && <Link href="/transaction/archive-bills" className={styles.flyoutLink}>Archive Bills</Link>}
-                {(isAdmin || hasModule('invoice')) && <Link href="/transaction/invoice" className={styles.flyoutLink}>Bill / Invoice</Link>}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* SetUp */}
-        {showSetUp && (
-          <div className={styles.navGroup}>
-            <button
-              className={`${styles.navHeader} ${openMenus.setup || pathname.startsWith('/setup/') || pathname === '/shortcuts' ? styles.navHeaderActive : ''}`}
-              onClick={() => toggleMenu('setup')}
-              title={isCollapsed ? "SetUp" : ""}
-            >
-              <div className={styles.navHeaderContent}>
-                <Settings size={19} className={styles.navIcon} />
-                {!isCollapsed && <span>SetUp</span>}
-              </div>
-              {!isCollapsed && (
-                <ChevronDown
-                  size={15}
-                  className={`${styles.chevronIcon} ${openMenus.setup ? styles.chevronIconRotated : ''}`}
-                />
+              {/* Flyout Submenu (Collapsed Mode Hover) */}
+              {isCollapsed && (
+                <div className={styles.flyoutMenu}>
+                  <div className={styles.flyoutTitle}>{group.label}</div>
+                  {items.map((item) =>
+                    item.comingSoon ? (
+                      <a key={item.label} className={styles.flyoutLink} href="#" onClick={e => e.preventDefault()}>
+                        {item.label} (Soon)
+                      </a>
+                    ) : (
+                      <Link key={item.href} href={item.href} className={styles.flyoutLink}>
+                        <ShortcutLabel text={item.label} letter={item.letter} />
+                      </Link>
+                    )
+                  )}
+                </div>
               )}
-            </button>
-            {!isCollapsed && (
-              <div className={`${styles.submenu} ${openMenus.setup ? styles.submenuOpen : ''}`}>
-                <Link href="/setup/settings" className={`${styles.sublink} ${pathname === '/setup/settings' ? styles.sublinkActive : ''}`}>
-                  <span>Lab & Report Settings</span>
-                  <span className={styles.adminBadge}>Admin</span>
-                </Link>
-                <Link href="/setup/users" className={`${styles.sublink} ${pathname === '/setup/users' ? styles.sublinkActive : ''}`}>
-                  <span>User Management</span>
-                  <span className={styles.adminBadge}>Admin</span>
-                </Link>
-                <Link href="/setup/permissions" className={`${styles.sublink} ${pathname === '/setup/permissions' ? styles.sublinkActive : ''}`}>
-                  <span>Permission Matrix</span>
-                  <span className={styles.adminBadge}>Admin</span>
-                </Link>
-                <Link href="/setup/audit-trail" className={`${styles.sublink} ${pathname === '/setup/audit-trail' ? styles.sublinkActive : ''}`}>
-                  <span>System Audit Trail</span>
-                  <span className={styles.adminBadge}>Admin</span>
-                </Link>
-                <Link href="/shortcuts" className={`${styles.sublink} ${pathname === '/shortcuts' ? styles.sublinkActive : ''}`}>
-                  <span>Configure Shortcuts</span>
-                  <span className={styles.adminBadge}>Admin</span>
-                </Link>
-              </div>
-            )}
-
-            {/* Flyout Submenu (Collapsed Mode) */}
-            {isCollapsed && (
-              <div className={styles.flyoutMenu}>
-                <div className={styles.flyoutTitle}>SetUp</div>
-                <Link href="/setup/settings" className={styles.flyoutLink}>Lab & Report Settings</Link>
-                <Link href="/setup/users" className={styles.flyoutLink}>User Management</Link>
-                <Link href="/setup/permissions" className={styles.flyoutLink}>Permission Matrix</Link>
-                <Link href="/setup/audit-trail" className={styles.flyoutLink}>System Audit Trail</Link>
-                <Link href="/shortcuts" className={styles.flyoutLink}>Configure Shortcuts</Link>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Report Print */}
-        {showPrint && (
-          <div className={styles.navGroup}>
-            <button
-              className={`${styles.navHeader} ${openMenus.print ? styles.navHeaderActive : ''}`}
-              onClick={() => toggleMenu('print')}
-              title={isCollapsed ? "Report Print" : ""}
-            >
-              <div className={styles.navHeaderContent}>
-                <Printer size={19} className={styles.navIcon} />
-                {!isCollapsed && <span>Report Print</span>}
-              </div>
-              {!isCollapsed && (
-                <ChevronDown
-                  size={15}
-                  className={`${styles.chevronIcon} ${openMenus.print ? styles.chevronIconRotated : ''}`}
-                />
-              )}
-            </button>
-            {!isCollapsed && (
-              <div className={`${styles.submenu} ${openMenus.print ? styles.submenuOpen : ''}`}>
-                <a className={styles.sublink} href="#" onClick={e => e.preventDefault()}>
-                  <span>Doctor List</span>
-                  <span className={styles.legacyBadge}>Coming Soon</span>
-                </a>
-                <a className={styles.sublink} href="#" onClick={e => e.preventDefault()}>
-                  <span>Sale - Before Bill</span>
-                  <span className={styles.legacyBadge}>Coming Soon</span>
-                </a>
-                <a className={styles.sublink} href="#" onClick={e => e.preventDefault()}>
-                  <span>Sale - After Bill</span>
-                  <span className={styles.legacyBadge}>Coming Soon</span>
-                </a>
-                <a className={styles.sublink} href="#" onClick={e => e.preventDefault()}>
-                  <span>Collector Register</span>
-                  <span className={styles.legacyBadge}>Coming Soon</span>
-                </a>
-              </div>
-            )}
-
-            {/* Flyout Submenu (Collapsed Mode) */}
-            {isCollapsed && (
-              <div className={styles.flyoutMenu}>
-                <div className={styles.flyoutTitle}>Report Print</div>
-                <a className={styles.flyoutLink} href="#" onClick={e => e.preventDefault()}>Doctor List (Soon)</a>
-                <a className={styles.flyoutLink} href="#" onClick={e => e.preventDefault()}>Sale - Before Bill (Soon)</a>
-                <a className={styles.flyoutLink} href="#" onClick={e => e.preventDefault()}>Sale - After Bill (Soon)</a>
-                <a className={styles.flyoutLink} href="#" onClick={e => e.preventDefault()}>Collector Register (Soon)</a>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Report/Query */}
-        {showQuery && (
-          <div className={styles.navGroup}>
-            <button
-              className={`${styles.navHeader} ${openMenus.query || pathname.startsWith('/pending-tests') || pathname.startsWith('/lab/') ? styles.navHeaderActive : ''}`}
-              onClick={() => toggleMenu('query')}
-              title={isCollapsed ? "Report/Query" : ""}
-            >
-              <div className={styles.navHeaderContent}>
-                <BarChart3 size={19} className={styles.navIcon} />
-                {!isCollapsed && <span>Report/Query</span>}
-              </div>
-              {!isCollapsed && (
-                <ChevronDown
-                  size={15}
-                  className={`${styles.chevronIcon} ${openMenus.query ? styles.chevronIconRotated : ''}`}
-                />
-              )}
-            </button>
-            {!isCollapsed && (
-              <div className={`${styles.submenu} ${openMenus.query ? styles.submenuOpen : ''}`}>
-                {(isAdmin || hasModule('sample_tracking')) && (
-                  <Link href="/lab/sample-tracking" className={`${styles.sublink} ${pathname === '/lab/sample-tracking' ? styles.sublinkActive : ''}`}>
-                    <span>Sample Tracking</span>
-                  </Link>
-                )}
-                {(isAdmin || hasModule('result_entry')) && (
-                  <Link href="/lab/result-entry" className={`${styles.sublink} ${pathname === '/lab/result-entry' ? styles.sublinkActive : ''}`}>
-                    <span>Lab Result Entry</span>
-                  </Link>
-                )}
-                {(isAdmin || hasModule('verification')) && (
-                  <Link href="/lab/verification" className={`${styles.sublink} ${pathname === '/lab/verification' ? styles.sublinkActive : ''}`}>
-                    <span>Pathology Verification</span>
-                  </Link>
-                )}
-                {(isAdmin || hasModule('pending_tests')) && (
-                  <Link href="/pending-tests" className={`${styles.sublink} ${pathname === '/pending-tests' ? styles.sublinkActive : ''}`}>
-                    <span>Pending <u>T</u>est Register</span>
-                  </Link>
-                )}
-              </div>
-            )}
-
-            {/* Flyout Submenu (Collapsed Mode) */}
-            {isCollapsed && (
-              <div className={styles.flyoutMenu}>
-                <div className={styles.flyoutTitle}>Report/Query</div>
-                {(isAdmin || hasModule('sample_tracking')) && <Link href="/lab/sample-tracking" className={styles.flyoutLink}>Sample Tracking</Link>}
-                {(isAdmin || hasModule('result_entry')) && <Link href="/lab/result-entry" className={styles.flyoutLink}>Lab Result Entry</Link>}
-                {(isAdmin || hasModule('verification')) && <Link href="/lab/verification" className={styles.flyoutLink}>Pathology Verification</Link>}
-                {(isAdmin || hasModule('pending_tests')) && <Link href="/pending-tests" className={styles.flyoutLink}>Pending Test Register</Link>}
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          );
+        })}
       </nav>
 
       {/* Sidebar Footer with Collapse Toggle */}
@@ -429,7 +409,7 @@ export default function Sidebar({ isOpen }) {
             </a>
           </>
         )}
-        
+
         {isLoaded && activeUser && (
           <div className={styles.userCard} title={isCollapsed ? `${activeUser.full_name || activeUser.username} (${activeUser.role_code})` : ""}>
             <div className={styles.userAvatar}>

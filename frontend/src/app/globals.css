@@ -123,6 +123,37 @@ a {
   text-decoration: none;
 }
 
+/* Keyboard shortcut feedback: flashed on the button / link a shortcut triggers
+   (see components/ShortcutLabel.js -> flashShortcut). !important so it wins over other animations. */
+.shortcut-flash {
+  animation: shortcutFlash 0.7s ease-out 1 !important;
+}
+
+@keyframes shortcutFlash {
+  0% {
+    transform: scale(1);
+    filter: brightness(1.3);
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.95);
+  }
+  40% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 6px rgba(250, 204, 21, 0.55);
+  }
+  100% {
+    transform: scale(1);
+    filter: none;
+    box-shadow: 0 0 0 14px rgba(250, 204, 21, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shortcut-flash {
+    animation: none !important;
+    outline: 2px solid #facc15;
+    outline-offset: 2px;
+  }
+}
+
 button, select, input, textarea {
   font-family: inherit;
 }

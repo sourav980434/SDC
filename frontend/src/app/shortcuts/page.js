@@ -317,10 +317,10 @@ export default function ShortcutsPage() {
                     <td className={styles.td}>
                       <div className={styles.actionName}>{item.label}</div>
                       <div className={styles.actionDesc}>
-                        {item.locked 
+                        {item.description || (item.locked
                           ? `Pressing this key combo instantly jumps to the corresponding page from anywhere.`
                           : `Local trigger active on target form pages for high-speed processing.`
-                        }
+                        )}
                       </div>
                     </td>
                     <td className={styles.td}>

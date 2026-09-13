@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { flashShortcut } from '../components/ShortcutLabel';
 
 const HotkeyContext = createContext();
 
@@ -12,11 +13,20 @@ export const DEFAULT_SHORTCUTS = {
   GOTO_PENDING: { key: 'Alt+t', label: 'Go to Pending Register', locked: true },
   CLOSE_MODAL: { key: 'Escape', label: 'Close Modal', locked: true },
 
+  // Locked sidebar menu hotkeys: open the menu, then press the item's underlined letter (components/Sidebar.js)
+  MENU_MASTER: { key: 'Alt+m', label: 'Open Master Menu', locked: true, description: 'Opens the Master menu in the sidebar; then press the underlined letter of a page (e.g. D = Doctor List).' },
+  MENU_TRANSACTION: { key: 'Alt+r', label: 'Open Transaction Menu', locked: true, description: 'Opens the Transaction menu in the sidebar; then press the underlined letter (B = Booking, A = Archive Bills, I = Bill / Invoice).' },
+  MENU_SETUP: { key: 'Alt+u', label: 'Open SetUp Menu', locked: true, description: 'Opens the SetUp menu in the sidebar; then press the underlined letter of a page.' },
+  MENU_PRINT: { key: 'Alt+o', label: 'Open Report Print Menu', locked: true, description: 'Opens the Report Print menu in the sidebar (reports coming soon).' },
+  MENU_QUERY: { key: 'Alt+q', label: 'Open Report/Query Menu', locked: true, description: 'Opens the Report/Query menu in the sidebar; then press the underlined letter (S, R, V, T).' },
+
   // Customizable action hotkeys
   FOCUS_TEST_SEARCH: { key: 'Alt+f', label: 'Focus Test Search', locked: false },
   SAVE_VOUCHER: { key: 'Alt+s', label: 'Save Booking', locked: false },
   PRINT_INVOICE: { key: 'Alt+p', label: 'Print Receipt', locked: false },
   CLEAR_FORM: { key: 'Alt+c', label: 'Clear Form', locked: false },
+  NEW_BOOKING: { key: 'Alt+n', label: 'New Booking', locked: false },
+  OPEN_BOOKING_LIST: { key: 'Alt+l', label: 'Open Booking List', locked: false },
 };
 
 export function HotkeyProvider({ children }) {
@@ -32,7 +42,8 @@ export function HotkeyProvider({ children }) {
         const merged = { ...DEFAULT_SHORTCUTS };
         Object.keys(parsed).forEach((action) => {
           if (merged[action] && !merged[action].locked) {
-            merged[action].key = parsed[action];
+            // Copy the entry so DEFAULT_SHORTCUTS itself is not mutated (keeps "Reset to defaults" correct)
+            merged[action] = { ...merged[action], key: parsed[action] };
           }
         });
         setShortcuts(merged);
@@ -105,12 +116,15 @@ export function HotkeyProvider({ children }) {
       // We handle global navigation hotkeys here
       if (combo === shortcuts.GOTO_DASHBOARD.key) {
         e.preventDefault();
+        flashShortcut('GOTO_DASHBOARD');
         router.push('/dashboard');
       } else if (combo === shortcuts.GOTO_BOOKING.key) {
         e.preventDefault();
+        flashShortcut('GOTO_BOOKING');
         router.push('/booking');
       } else if (combo === shortcuts.GOTO_PENDING.key) {
         e.preventDefault();
+        flashShortcut('GOTO_PENDING');
         router.push('/pending-tests');
       }
     };
