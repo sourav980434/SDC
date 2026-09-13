@@ -6,8 +6,11 @@ import { Search, Plus, Edit, Trash2, Save, X, LogOut } from 'lucide-react';
 import styles from '../master.module.css';
 
 import API_BASE from '@/lib/apiConfig';
+import { useAlert } from '@/components/AlertDialog';
+
 export default function MarketingExecutiveMaster() {
   const router = useRouter();
+  const { showAlert } = useAlert();
   
   // State
   const [agents, setAgents] = useState([]);
@@ -170,7 +173,7 @@ export default function MarketingExecutiveMaster() {
   const handleSaveClick = (e) => {
     e.preventDefault();
     if (!descr.trim()) {
-      alert("Name is required");
+      showAlert({ type: 'warning', title: 'Required field', message: 'Name is required.' });
       return;
     }
 

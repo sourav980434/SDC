@@ -6,8 +6,11 @@ import { Search, Plus, Edit, Trash2, Save, X, LogOut } from 'lucide-react';
 import styles from '../master.module.css';
 
 import API_BASE from '@/lib/apiConfig';
+import { useAlert } from '@/components/AlertDialog';
+
 export default function PatientMaster() {
   const router = useRouter();
+  const { showAlert } = useAlert();
 
   // State
   const [patients, setPatients] = useState([]);
@@ -195,7 +198,7 @@ export default function PatientMaster() {
   const handleSaveClick = (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      alert("Name is required.");
+      showAlert({ type: 'warning', title: 'Required field', message: 'Name is required.' });
       return;
     }
 

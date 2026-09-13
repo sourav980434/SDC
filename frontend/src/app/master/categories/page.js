@@ -6,8 +6,11 @@ import { Search, Plus, Edit, Trash2, Save, X, LogOut } from 'lucide-react';
 import styles from '../master.module.css';
 
 import API_BASE from '@/lib/apiConfig';
+import { useAlert } from '@/components/AlertDialog';
+
 export default function CategoryMaster() {
   const router = useRouter();
+  const { showAlert } = useAlert();
   
   // State
   const [categories, setCategories] = useState([]);
@@ -137,7 +140,7 @@ export default function CategoryMaster() {
   const handleSaveClick = (e) => {
     e.preventDefault();
     if (!descr.trim()) {
-      alert("Category Name is required");
+      showAlert({ type: 'warning', title: 'Required field', message: 'Category Name is required.' });
       return;
     }
 

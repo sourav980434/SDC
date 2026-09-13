@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Printer, FileText, CheckCircle, X, ShieldAlert } from 'lucide-react';
 import styles from './invoice.module.css';
 import PermissionButton from '@/components/PermissionButton';
+import { useAlert } from '@/components/AlertDialog';
 import { useActionPermission } from '@/hooks/useActionPermission';
 
 import API_BASE from '@/lib/apiConfig';
@@ -11,6 +12,7 @@ import { generateA5BillReceiptHTML } from '@/lib/billReceiptTemplate';
 
 export default function InvoicePage() {
   const perms = useActionPermission('invoice');
+  const { showAlert } = useAlert();
   const [invoices, setInvoices] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -124,7 +126,7 @@ export default function InvoicePage() {
     })
       .then(res => res.json())
       .then(data => {
-        alert(`Balance ₹ ${dueVal.toFixed(2)} collected successfully! Invoice is now FULLY PAID.`);
+        showAlert({ type: 'success', title: 'Balance collected', message: `Balance ₹ ${dueVal.toFixed(2)} collected successfully. Invoice is now FULLY PAID.` });
         fetchInvoices(search);
         if (selectedInv) {
           const invKey = selectedInv.invoiceNo || selectedInv.invoice_no;
@@ -136,26 +138,26 @@ export default function InvoicePage() {
             });
         }
       })
-      .catch(err => alert("Error updating invoice balance"));
+      .catch(() => showAlert({ type: 'error', title: 'Update failed', message: 'Error updating invoice balance. Please try again.' }));
   };
 
   const handlePrintSelectedTaxInvoice = (targetInv = null) => {
     const isEvent = targetInv && (targetInv.nativeEvent || typeof targetInv.preventDefault === 'function');
     const rawInv = (isEvent ? selectedInv : targetInv) || selectedInv;
     if (!rawInv) {
-      alert("No invoice selected for printing.");
+      showAlert({ type: 'warning', title: 'No invoice selected', message: 'Please select an invoice to print.' });
       return;
     }
 
     const invKey = rawInv.invoiceNo || rawInv.invoice_no || rawInv.bookingNo || rawInv.booking_no;
     if (!invKey) {
-      alert("Invalid invoice reference number.");
+      showAlert({ type: 'error', title: 'Invalid invoice', message: 'Invalid invoice reference number.' });
       return;
     }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Please allow pop-ups to print the final tax invoice.');
+      showAlert({ type: 'warning', title: 'Pop-up blocked', message: 'Your browser blocked the print window. Allow pop-ups for this site to print the final tax invoice.' });
       return;
     }
     printWindow.document.write('<div style="font-family:sans-serif; padding:40px; text-align:center; color:#475569;"><h2>Loading Invoice Receipt...</h2><p>Please wait a moment while details are fetched.</p></div>');

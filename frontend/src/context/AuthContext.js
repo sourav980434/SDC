@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useAlert } from '@/components/AlertDialog';
 
 const AuthContext = createContext({
   user: null,
@@ -18,6 +19,7 @@ export function AuthProvider({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const inactivityTimerRef = useRef(null);
+  const { showAlert } = useAlert();
 
   // Initialize session from sessionStorage
   useEffect(() => {
@@ -50,7 +52,7 @@ export function AuthProvider({ children }) {
       sessionStorage.removeItem('sdcp_user_session');
       setUser(null);
       if (reason) {
-        alert(reason);
+        showAlert({ type: 'warning', title: 'Signed out', message: reason });
       }
       router.push('/login');
     } catch (e) {

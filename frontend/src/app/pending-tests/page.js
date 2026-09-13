@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import styles from './pending.module.css';
 import PermissionButton from '@/components/PermissionButton';
+import { useAlert } from '@/components/AlertDialog';
 import { useActionPermission } from '@/hooks/useActionPermission';
 
 import API_BASE from '@/lib/apiConfig';
@@ -33,6 +34,7 @@ import { useAuth } from '@/context/AuthContext';
 export default function PendingTestRegister() {
   const { shortcuts, parseKeyEvent } = useHotkeys();
   const perms = useActionPermission('pending_tests');
+  const { showAlert } = useAlert();
   const { user: activeUser } = useAuth();
   const isAdmin = activeUser?.role_code === 'ADMIN';
 
@@ -293,7 +295,7 @@ export default function PendingTestRegister() {
       })
       .catch(err => {
         setSavingResult(false);
-        alert("Error saving test result parameters");
+        showAlert({ type: 'error', title: 'Save failed', message: 'Error saving test result parameters. Please try again.' });
       });
   };
 
