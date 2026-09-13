@@ -503,6 +503,32 @@
   margin-top: 10px;
 }
 
+/* Header "New" button (Alt+N): gentle pulse while a saved booking is on screen,
+   prompting the operator to start the next booking. Driven by data-attention (not className)
+   so the global .shortcut-flash class is not wiped when the form clears. */
+.newBtn[data-attention="true"] {
+  animation: newBtnPulse 1.8s ease-out infinite;
+}
+
+@keyframes newBtnPulse {
+  0% {
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25), 0 0 0 0 rgba(103, 186, 253, 0.8);
+  }
+  70% {
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25), 0 0 0 9px rgba(103, 186, 253, 0);
+  }
+  100% {
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25), 0 0 0 0 rgba(103, 186, 253, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .newBtn[data-attention="true"] {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(103, 186, 253, 0.85) !important;
+  }
+}
+
 .savePrintRow {
   display: grid;
   grid-template-columns: 1fr 1fr;

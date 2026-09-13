@@ -32,6 +32,9 @@ export function generateA5BookingReceiptHTML(data) {
     balanceDue = 0,
     paymentMethod = 'Cash',
     printedBy = 'Admin',
+    // true: open print dialog immediately and close the tab afterwards (Print Receipt button)
+    // false: show the receipt with Print / Close toolbar buttons (after Save)
+    autoPrint = true,
   } = data;
 
   const amountInWords = numberToWords(advanceReceived > 0 ? advanceReceived : grandTotal);
@@ -402,6 +405,65 @@ export function generateA5BookingReceiptHTML(data) {
       color: #070a61;
     }
 
+    /* Screen-only toolbar (hidden when printing via .no-print) */
+    .print-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 10px;
+      padding: 8px 12px;
+      background: #070a61;
+      color: #ffffff;
+      border-radius: 8px;
+    }
+
+    .toolbar-title {
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .toolbar-hint {
+      margin-left: 8px;
+      font-size: 10px;
+      font-weight: 500;
+      opacity: 0.75;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tb-btn {
+      padding: 7px 18px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tb-print {
+      background: #ffffff;
+      color: #070a61;
+    }
+
+    .tb-close {
+      background: transparent;
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.55);
+    }
+
+    .tb-btn:hover {
+      filter: brightness(0.92);
+    }
+
+    .tb-btn:focus-visible {
+      outline: 2px solid #67bafd;
+      outline-offset: 2px;
+    }
+
     @media print {
       @page {
         size: A5 landscape;
@@ -422,6 +484,17 @@ export function generateA5BookingReceiptHTML(data) {
   </style>
 </head>
 <body>
+
+  <div class="print-toolbar no-print">
+    <div class="toolbar-title">
+      Booking Receipt · ${bookingNo}
+      <span class="toolbar-hint">Ctrl+P to print · Esc to close</span>
+    </div>
+    <div class="toolbar-actions">
+      <button type="button" class="tb-btn tb-print" onclick="window.print()" autofocus>🖨&nbsp; Print</button>
+      <button type="button" class="tb-btn tb-close" onclick="window.close()">✕&nbsp; Close</button>
+    </div>
+  </div>
 
   <div class="receipt-container">
 
@@ -607,10 +680,20 @@ export function generateA5BookingReceiptHTML(data) {
   </div>
 
   <script>
-    window.onload = function() {
+    ${
+      autoPrint
+        ? `window.onload = function() {
       window.print();
       setTimeout(function() { window.close(); }, 600);
-    };
+    };`
+        : `document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') window.close();
+    });
+    window.addEventListener('load', function () {
+      var btn = document.querySelector('.tb-print');
+      if (btn) btn.focus();
+    });`
+    }
   </script>
 </body>
 </html>
