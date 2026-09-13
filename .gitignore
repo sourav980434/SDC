@@ -32,3 +32,7 @@ Thumbs.db
 
 # Report Templates (Word/Excel) - kept on disk only
 REPORT MASTER/
+
+# Laravel generated runtime files
+backend/storage/framework/cache/
+backend/storage/framework/views/
