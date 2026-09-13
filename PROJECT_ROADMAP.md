@@ -48,5 +48,17 @@ A complete end-to-end **Pathology & Diagnostic Centre ERP & Web Management Porta
 
 ---
 
+## 🧩 Shared UI Standards (Apply to Every Module)
+
+Every module above — completed or planned — must follow the shared conventions in [PROJECT_MEMORY.md](PROJECT_MEMORY.md):
+
+| Standard | Summary | Status |
+|---|---|---|
+| [Alert Dialog](PROJECT_MEMORY.md#1-alert-dialog-instead-of-windowalert) | Use `showAlert()` instead of `window.alert()` | ✅ Complete — all 41 alerts across the app converted (13-Sep-2026) |
+
+---
+
 ## 📌 Note for AI Agent
 Whenever the user starts a discussion or asks for suggestions on what to build or refine next, **refer to this roadmap file** and suggest starting with one of the PLANNED modules above (e.g. Doctor Commission Calculation, Diagnostic Result Entry, Part Payment, or MIS Reports).
+
+When building any module, follow [PROJECT_ARCHITECTURE.md](PROJECT_ARCHITECTURE.md) and the shared UI conventions in [PROJECT_MEMORY.md](PROJECT_MEMORY.md).
