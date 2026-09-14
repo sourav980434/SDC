@@ -35,6 +35,10 @@ The application operates with a **strict separation** between the historical leg
 ## 🔌 API Routes Reference (`backend/routes/web.php`)
 
 ### 1. Web Billing APIs
+- `GET /api/booking/init`
+  - **Booking page bootstrap — one request instead of four.** Returns `next` (serial, booking_no, fin_year, next_num), `patient_implemented`, `categories` (MCategory), and active `collectors` (MCollector `Status = 1`).
+- `GET /api/tests/catalogue`
+  - Full test list with GENERAL (`CG1`) rates, same shape as `/api/tests`. Cached server-side for 60 s; the Booking page loads it once, filters in the browser, and refreshes every 5 min.
 - `GET /api/booking/next-no`
   - Calculates max `serial_no` from `tbl_web_booking_hdr`.
   - Returns `01001` (`BK/26-27/01001`) if table is empty, or increments by 1.
@@ -73,6 +77,7 @@ The application operates with a **strict separation** between the historical leg
   - `<Header>` (Top search bar, title, user menu)
   - `<main className={styles.content}>{children}</main>`
   - `<Footer>` (System online status footer)
+- **Sidebar menu** starts with a **Dashboard** direct link (Alt+D, active on `/dashboard`), followed by the groups defined once in `MENU_GROUPS` (`frontend/src/components/Sidebar.js`) — groups, items, permission module keys, badges and keyboard accelerators. Keyboard: menu key (Alt+M Master, Alt+R Transaction, Alt+U SetUp, Alt+O Report Print, Alt+Q Report/Query) opens the menu, then the item's underlined letter opens the page. Letter table: PROJECT_MEMORY.md §3.
 - **RULE FOR NEW PAGES:** Route group layouts (e.g. `frontend/src/app/transaction/layout.js`, `master/layout.js`) MUST export `DashboardLayout`. Individual `page.js` files **MUST NOT** render `<Sidebar>`, `<Header>`, or `<Footer>` inside `page.js` to avoid duplicate layout overlays.
 
 ### 2. Booking Page Header & Saved Metadata Display
@@ -92,6 +97,13 @@ The application operates with a **strict separation** between the historical leg
     </div>
     ```
   - When clicking **Clear Form** or creating a new bill, `savedBillInfo` is reset to `null` so the text disappears.
+  - **After Save / Update the page stays on the saved booking** (it does NOT auto-clear). The booking is reloaded from the database via `handleLoadBookingFromExplorer()` — saved date/user, payment receipts, and an empty Received Amount — so the operator can print the receipt or save it as PDF. Focus moves to **Print Receipt**; **New** (`Alt+N`) or **Clear Form** starts the next booking. While a saved booking is on screen the **New** button pulses (`.newBtn[data-attention="true"]`), and it flashes when Alt+N starts a new booking (shared shortcut flash — see PROJECT_MEMORY.md §3). (Replaces the earlier auto-clear behaviour, DEVELOPMENT_LOG §16.)
+  - **Save also opens the Booking Receipt in a new tab** with on-screen **Print** / **Close** buttons (hidden when printing; Esc closes). The tab is opened synchronously inside the Save click / shortcut (so pop-up blockers allow it), shows "Saving booking…", and is filled from the saved DB record (`writeSavedBookingReceipt()` → `generateA5BookingReceiptHTML({ ..., autoPrint: false })`). If the save fails the tab is closed. The manual **Print Receipt** button keeps the default `autoPrint: true` (print dialog immediately, tab closes after).
+
+### 3. Alerts & Messages (`AlertDialog`)
+- **RULE:** Never use the browser `window.alert()` in pages. Use the shared `showAlert()` from `frontend/src/components/AlertDialog.js` (mounted once as `<AlertProvider>` in `frontend/src/app/layout.js`).
+- Types: `warning` · `error` · `success` · `info`. `showAlert()` returns a Promise — chain `.then()` to restore keyboard focus.
+- Full usage, options, and conversion status: see [PROJECT_MEMORY.md → Alert Dialog](PROJECT_MEMORY.md#1-alert-dialog-instead-of-windowalert).
 
 ---
 
@@ -101,3 +113,4 @@ Any developer or AI agent modifying or extending this application MUST:
 1. Update `e:\SANTOSHPUR\PROJECT_ARCHITECTURE.md` with any new tables, APIs, or architectural decisions.
 2. Update `e:\SANTOSHPUR\DEVELOPMENT_LOG.md` with a summary of changes made.
 3. Maintain exact adherence to the **Strict Database Isolation Strategy** (New web app = `tbl_web_*` starting at 1001; Old archive = `TBookingHDR`).
+4. Follow the shared conventions in [PROJECT_MEMORY.md](PROJECT_MEMORY.md), and record any new reusable component or pattern there.

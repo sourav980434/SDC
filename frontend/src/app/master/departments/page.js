@@ -6,8 +6,11 @@ import { Search, Plus, Edit, Trash2, Save, X, LogOut } from 'lucide-react';
 import styles from '../master.module.css';
 
 import API_BASE from '@/lib/apiConfig';
+import { useAlert } from '@/components/AlertDialog';
+
 export default function DepartmentMaster() {
   const router = useRouter();
+  const { showAlert } = useAlert();
   
   // State
   const [departments, setDepartments] = useState([]);
@@ -152,7 +155,7 @@ export default function DepartmentMaster() {
   const handleSaveClick = (e) => {
     e.preventDefault();
     if (!descr.trim()) {
-      alert("Department Name is required");
+      showAlert({ type: 'warning', title: 'Required field', message: 'Department Name is required.' });
       return;
     }
 

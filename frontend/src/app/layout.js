@@ -1,6 +1,7 @@
 import { AuthProvider } from "@/context/AuthContext";
 import { HotkeyProvider } from "@/context/HotkeyContext";
 import ResolutionScaler from "@/components/ResolutionScaler";
+import { AlertProvider } from "@/components/AlertDialog";
 import "./globals.css";
 
 export const metadata = {
@@ -13,13 +14,15 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          <ResolutionScaler>
-            <HotkeyProvider>
-              {children}
-            </HotkeyProvider>
-          </ResolutionScaler>
-        </AuthProvider>
+        <AlertProvider>
+          <AuthProvider>
+            <ResolutionScaler>
+              <HotkeyProvider>
+                {children}
+              </HotkeyProvider>
+            </ResolutionScaler>
+          </AuthProvider>
+        </AlertProvider>
       </body>
     </html>
   );

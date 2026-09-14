@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, CheckCircle, ShieldCheck, FileCheck, Lock, X, ShieldAlert, AlertTriangle } from 'lucide-react';
 import styles from '../sample-tracking/sample.module.css';
 import PermissionButton from '@/components/PermissionButton';
+import { useAlert } from '@/components/AlertDialog';
 import { useActionPermission } from '@/hooks/useActionPermission';
 
 import API_BASE from '@/lib/apiConfig';
@@ -12,6 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function PathologyVerificationPage() {
   const perms = useActionPermission('verification');
+  const { showAlert } = useAlert();
   const { user: activeUser } = useAuth();
   const isAdmin = activeUser?.role_code === 'ADMIN';
 
@@ -151,7 +153,7 @@ export default function PathologyVerificationPage() {
         setTimeout(() => setMessage(''), 4000);
         fetchVerificationQueue();
       })
-      .catch(err => alert("Error approving report"));
+      .catch(() => showAlert({ type: 'error', title: 'Approval failed', message: 'Error approving report. Please check the backend connection and try again.' }));
   };
 
   const parseResultJson = (item) => {

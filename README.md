@@ -26,6 +26,7 @@ SANTOSHPUR/
 │   ├── start-hidden.vbs               ← VBScript silent launcher helper
 │   ├── stop-app.bat                   ← সার্ভিস বন্ধ
 │   ├── update-code.bat                ← GitHub থেকে কোড আপডেট
+│   ├── push-code.bat                  ← কোড commit করে GitHub-এ push
 │   ├── setup-first-time.bat           ← প্রথমবার সেটআপ (npm install + driver)
 │   ├── auto-install-sqlsrv-driver.bat ← SQL Server PHP driver auto-installer
 │   └── install_driver.ps1             ← PowerShell driver download script
@@ -33,6 +34,7 @@ SANTOSHPUR/
 ├── start-app.bat                      ← রুট লঞ্চার → scripts/start-app.bat
 ├── stop-app.bat                       ← রুট স্টপার → scripts/stop-app.bat
 ├── update-code.bat                    ← রুট আপডেটার → scripts/update-code.bat
+├── push-code.bat                      ← রুট পুশার → scripts/push-code.bat
 ├── auto-install-sqlsrv-driver.bat     ← রুট ড্রাইভার → scripts/auto-install-...
 │
 ├── DEVELOPMENT_LOG.md                 ← ডেভেলপমেন্ট লগ ও নিয়মাবলি
@@ -94,6 +96,7 @@ DB_PASSWORD=<PASSWORD>
 | `start-app.bat` | Backend (Port 8000) + Frontend (Port 3000) চালু, ব্রাউজার ওপেন |
 | `stop-app.bat` | সব সার্ভিস বন্ধ |
 | `update-code.bat` | GitHub থেকে latest code pull |
+| `push-code.bat` | (Developer PC) সব change commit করে current branch GitHub-এ push; `main`-এ push করার আগে confirm চায় |
 | `auto-install-sqlsrv-driver.bat` | SQL Server PHP driver auto download ও install |
 
 ---

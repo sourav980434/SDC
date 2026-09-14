@@ -8,10 +8,12 @@ import styles from '../master.module.css';
 import API_BASE from '@/lib/apiConfig';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { AlertTriangle } from 'lucide-react';
+import { useAlert } from '@/components/AlertDialog';
 
 export default function DoctorMaster() {
   const router = useRouter();
   const perms = useActionPermission('masters');
+  const { showAlert } = useAlert();
   
   // State
   const [doctors, setDoctors] = useState([]);
@@ -201,7 +203,7 @@ export default function DoctorMaster() {
   const handleSaveClick = (e) => {
     e.preventDefault();
     if (!doctName.trim()) {
-      alert("Doctor Name is required");
+      showAlert({ type: 'warning', title: 'Required field', message: 'Doctor Name is required.' });
       return;
     }
 
@@ -250,6 +252,8 @@ export default function DoctorMaster() {
       fetchDoctors(searchQuery, newPage);
     }
   };
+
+  const isView = mode === 'view';
 
   if (perms.isLoaded && !perms.can_view) {
     return (

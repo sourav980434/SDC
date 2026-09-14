@@ -6,8 +6,11 @@ import { Search, Plus, Edit, Trash2, Save, X, LogOut } from 'lucide-react';
 import styles from '../master.module.css';
 
 import API_BASE from '@/lib/apiConfig';
+import { useAlert } from '@/components/AlertDialog';
+
 export default function CollectorMaster() {
   const router = useRouter();
+  const { showAlert } = useAlert();
   
   // State
   const [collectors, setCollectors] = useState([]);
@@ -167,7 +170,7 @@ export default function CollectorMaster() {
   const handleSaveClick = (e) => {
     e.preventDefault();
     if (!descr.trim()) {
-      alert("Name is required");
+      showAlert({ type: 'warning', title: 'Required field', message: 'Name is required.' });
       return;
     }
 

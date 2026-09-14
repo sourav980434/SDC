@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 
 Route::get('/', function () {
@@ -228,6 +229,37 @@ Route::get('/api/doctors', function (Request $request) {
     });
     
     return response()->json($doctors);
+});
+
+// Full Test Catalogue with GENERAL (CG1) rates - loaded once by Booking page for instant client-side search
+Route::get('/api/tests/catalogue', function () {
+    // Shared 60s server cache: every open booking counter refreshes this list, and the
+    // single-worker PHP server would otherwise spend ~1s per refresh pulling 1,283 rows from the remote DB
+    $tests = Cache::remember('tests_catalogue_cg1', 60, function () {
+        return DB::table('MTest as t')
+            ->leftJoin('MDepartment as d', 't.DeptCode', '=', 'd.Code')
+            ->leftJoin('MSubDepartment as sd', 't.SubDeptCode', '=', 'sd.Code')
+            ->leftJoin('MTestCategoryRate as r', function ($join) {
+                $join->on('t.Code', '=', 'r.TestCode')
+                     ->where('r.CatCode', '=', 'CG1');
+            })
+            ->select('t.Code as code', 't.Descr as name', 'd.Descr as dept_name', 'sd.Descr as sub_dept', 'r.Rate as price', 't.Duration as duration')
+            ->orderBy('t.Code', 'asc')
+            ->get()
+            ->map(function ($test) {
+                return [
+                    'code' => trim($test->code ?? ''),
+                    'name' => trim($test->name ?? ''),
+                    'dept_name' => trim($test->dept_name ?? 'GENERAL'),
+                    'sub_dept' => trim($test->sub_dept ?? ''),
+                    'price' => floatval($test->price ?? 0),
+                    'duration' => intval($test->duration ?? 0),
+                ];
+            })
+            ->all();
+    });
+
+    return response()->json($tests);
 });
 
 // Search Tests (for Booking dropdown)
@@ -773,9 +805,28 @@ function checkPatientTableExists() {
     }
 }
 
+// Fast "MPatient exists and has rows" check for hot read endpoints.
+// Only a positive result is cached (10 min) to save a remote DB round-trip per search;
+// the cache is cleared by the patient migration routes.
+function patientTableReady() {
+    if (Cache::get('mpatient_ready')) {
+        return true;
+    }
+    try {
+        $ready = (bool) DB::selectOne('SELECT TOP 1 1 AS x FROM MPatient');
+    } catch (\Exception $e) {
+        $ready = false;
+    }
+    if ($ready) {
+        Cache::put('mpatient_ready', true, 600);
+    }
+    return $ready;
+}
+
 // 1. Patient Table Migration - Initialization
 Route::post('/api/master/patients/migrate-init', function () {
     set_time_limit(0);
+    Cache::forget('mpatient_ready');
     
     try {
         DB::transaction(function () {
@@ -869,6 +920,7 @@ Route::post('/api/master/patients/migrate-chunk', function (Request $request) {
             WHERE RowNum BETWEEN :start AND :end
         ", ['start' => $start, 'end' => $end]);
         
+        Cache::forget('mpatient_ready');
         return response()->json(['success' => true, 'migrated' => ($end - $start + 1)]);
             
     } catch (\Exception $e) {
@@ -895,7 +947,7 @@ Route::get('/api/master/patients/status', function () {
 
 // 2. Fetch Patient by exact Code
 Route::get('/api/patients/by-code/{code}', function ($code) {
-    if (!checkPatientTableExists()) {
+    if (!patientTableReady()) {
         return response()->json(null);
     }
     
@@ -921,7 +973,7 @@ Route::get('/api/patients/by-code/{code}', function ($code) {
 
 // 3. Autocomplete Search by Name
 Route::get('/api/patients/search-name', function (Request $request) {
-    if (!checkPatientTableExists()) {
+    if (!patientTableReady()) {
         return response()->json([]);
     }
     
@@ -955,7 +1007,7 @@ Route::get('/api/patients/search-name', function (Request $request) {
 
 // 4. Autocomplete Search by Phone
 Route::get('/api/patients/search-phone', function (Request $request) {
-    if (!checkPatientTableExists()) {
+    if (!patientTableReady()) {
         return response()->json([]);
     }
     
@@ -1107,6 +1159,27 @@ Route::delete('/api/master/patients/{code}', function ($code) {
 // ==========================================
 // TRANSACTIONS & BOOKING APIs (Web Tables + Archive Viewer)
 // ==========================================
+
+// 0. Booking Page Bootstrap - one request instead of four on page load
+// (next booking no., patient master status, categories, active collectors)
+Route::get('/api/booking/init', function () {
+    $maxSerial = DB::table('tbl_web_booking_hdr')->max('serial_no');
+    $nextNum = $maxSerial !== null ? intval($maxSerial) + 1 : 1001;
+    $paddedSerial = str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+    $fyPrefix = getCurrentFinYear();
+
+    return response()->json([
+        'next' => [
+            'serial' => $paddedSerial,
+            'booking_no' => "BK/$fyPrefix/$paddedSerial",
+            'fin_year' => $fyPrefix,
+            'next_num' => $nextNum,
+        ],
+        'patient_implemented' => patientTableReady(),
+        'categories' => DB::table('MCategory')->orderBy('Code', 'desc')->get(),
+        'collectors' => DB::table('MCollector')->where('Status', 1)->orderBy('Code', 'asc')->get(),
+    ]);
+});
 
 // 1. Get Next Booking Number & Financial Year for Web Booking (Starts at 1001)
 Route::get('/api/booking/next-no', function () {
@@ -1551,10 +1624,12 @@ Route::get('/api/booking/universal-search', function (Request $request) {
             }
         });
 
-    $count = $query->count();
+    // Single round-trip: fetching at most 2 matches is enough to decide none / single / multiple
+    $matches = $query->select('h.booking_no', 'h.serial_no')->take(2)->get();
+    $count = $matches->count();
 
     if ($count === 1) {
-        $singleHdr = $query->first();
+        $singleHdr = $matches->first();
         return response()->json([
             'type' => 'single',
             'booking_no' => $singleHdr->booking_no,

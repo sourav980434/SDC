@@ -8,9 +8,11 @@ import API_BASE from '@/lib/apiConfig';
 import { getDeptBadgeStyle, DEPT_BADGE_BASE } from '@/lib/deptBadge';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { useAuth } from '@/context/AuthContext';
+import { useAlert } from '@/components/AlertDialog';
 
 export default function SampleTrackingPage() {
   const perms = useActionPermission('sample_tracking');
+  const { showAlert } = useAlert();
   const { user: activeUser } = useAuth();
   const isAdmin = activeUser?.role_code === 'ADMIN';
 
@@ -161,7 +163,7 @@ export default function SampleTrackingPage() {
     })
       .then(res => res.json())
       .then(() => fetchQueue())
-      .catch(err => alert("Error updating status"));
+      .catch(() => showAlert({ type: 'error', title: 'Update failed', message: 'Error updating sample status. Please try again.' }));
   };
 
   const handleOpenResultModal = (item) => {
@@ -182,7 +184,7 @@ export default function SampleTrackingPage() {
         setSelectedItem(null);
         fetchQueue();
       })
-      .catch(err => alert("Error saving result"));
+      .catch(() => showAlert({ type: 'error', title: 'Save failed', message: 'Error saving result. Please try again.' }));
   };
 
   const handleVerify = (id) => {
@@ -193,7 +195,7 @@ export default function SampleTrackingPage() {
     })
       .then(res => res.json())
       .then(() => fetchQueue())
-      .catch(err => alert("Error verifying test"));
+      .catch(() => showAlert({ type: 'error', title: 'Verification failed', message: 'Error verifying test. Please try again.' }));
   };
 
   // Metric counts

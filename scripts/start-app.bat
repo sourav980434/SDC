@@ -5,14 +5,21 @@ color 0A
 set "ROOT_DIR=%~dp0..\"
 cd /d "%ROOT_DIR%"
 
-:: Check PHP in PATH or add XAMPP PHP path if available
+:: Check PHP in PATH or add known PHP paths (later lines take priority)
 if exist "E:\xampp\php\php.exe" set "PATH=E:\xampp\php;%PATH%"
 if exist "C:\xampp\php\php.exe" set "PATH=C:\xampp\php;%PATH%"
 if exist "C:\php\php.exe" set "PATH=C:\php;%PATH%"
+if exist "C:\php84\php.exe" set "PATH=C:\php84;%PATH%"
+if exist "D:\php84\php.exe" set "PATH=D:\php84;%PATH%"
+if defined PHP_BIN if exist "%PHP_BIN%\php.exe" set "PATH=%PHP_BIN%;%PATH%"
 
 :: Verify PHP availability
 where php >nul 2>&1
 if %errorlevel% neq 0 goto :NO_PHP
+
+:: Verify PHP version (backend vendor packages require PHP 8.2+)
+php -r "exit(PHP_VERSION_ID >= 80200 ? 0 : 1);" >nul 2>&1
+if %errorlevel% neq 0 goto :OLD_PHP
 
 :: Verify Node.js availability
 where node >nul 2>&1
@@ -48,6 +55,14 @@ goto :START_SERVERS
 :NO_PHP
 echo [ERROR] PHP command was not found!
 echo Please install PHP or XAMPP on this system.
+pause
+exit /b 1
+
+:OLD_PHP
+echo [ERROR] PHP 8.2 or newer is required. Found:
+php -v
+echo.
+echo Install PHP 8.2 or newer to D:\php84, C:\php84, XAMPP, or set PHP_BIN to its folder.
 pause
 exit /b 1
 

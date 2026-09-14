@@ -16,9 +16,11 @@ import styles from './archive.module.css';
 
 import API_BASE from '@/lib/apiConfig';
 import { useActionPermission } from '@/hooks/useActionPermission';
+import { useAlert } from '@/components/AlertDialog';
 
 export default function ArchiveBillsPage() {
   const perms = useActionPermission('archive_bills');
+  const { showAlert } = useAlert();
 
   const [search, setSearch] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -132,7 +134,7 @@ export default function ArchiveBillsPage() {
   const handlePrintReceipt = (bill) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert("Please allow pop-ups to print the receipt.");
+      showAlert({ type: 'warning', title: 'Pop-up blocked', message: 'Your browser blocked the print window. Allow pop-ups for this site to print the receipt.' });
       return;
     }
 

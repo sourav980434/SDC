@@ -30,6 +30,8 @@ import {
 import { useSearchParams } from 'next/navigation';
 import styles from './booking.module.css';
 import PermissionButton from '@/components/PermissionButton';
+import { useAlert } from '@/components/AlertDialog';
+import { ShortcutLabel, flashShortcut, formatShortcut } from '@/components/ShortcutLabel';
 import { useActionPermission } from '@/hooks/useActionPermission';
 
 import API_BASE from '@/lib/apiConfig';
@@ -43,6 +45,32 @@ import { fetchLabSettings, getCachedLabSettings } from '@/lib/labSettings';
 export default function NewBooking() {
   const searchParams = useSearchParams();
   const { shortcuts, parseKeyEvent } = useHotkeys();
+  const { showAlert } = useAlert();
+  // Validation dialog when no test is added; returns focus to the test search box
+  const showNoTestAlert = () => {
+    showAlert({
+      type: 'warning',
+      title: 'No test selected',
+      message: 'Please select at least one test to continue.',
+    }).then(() => searchRef.current?.focus());
+  };
+
+  // Validation dialog when patient name is empty; returns focus to the name field
+  const showNoNameAlert = () => {
+    showAlert({
+      type: 'warning',
+      title: 'Patient name required',
+      message: 'Please enter the patient name to continue.',
+    }).then(() => nameRef.current?.focus());
+  };
+
+  const showPopupBlockedAlert = (documentName) => {
+    showAlert({
+      type: 'warning',
+      title: 'Pop-up blocked',
+      message: `Your browser blocked the print window. Allow pop-ups for this site to print the ${documentName}.`,
+    });
+  };
 
   const [activeUserSession, setActiveUserSession] = useState(null);
 
@@ -288,6 +316,30 @@ export default function NewBooking() {
       });
   };
 
+  // Page bootstrap: one request instead of four (the backend serves requests one at a time)
+  const loadBookingInit = () => {
+    fetch(`${API_BASE}/api/booking/init`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (data.next?.serial && data.next?.booking_no) {
+          setBookingSerial(data.next.serial);
+          setBookingNo(data.next.booking_no);
+        }
+        setIsPatientImplemented(!!data.patient_implemented);
+        setCategories(data.categories || []);
+        setCollectors((data.collectors || []).filter(c => Number(c.Status) === 1));
+      })
+      .catch(err => {
+        console.error("Error loading booking init data, using fallbacks:", err);
+        resetToNextBookingNo();
+        setCategories([{ Code: 'CG1', Descr: 'GENERAL' }]);
+        setCollectors([{ Code: 'CL000001', Descr: 'KHOKAN DAS', Status: 1 }]);
+      });
+  };
+
   // Set today's date, live ticking clock, and check table status on load
   useEffect(() => {
     const updateDateTime = () => {
@@ -318,38 +370,9 @@ export default function NewBooking() {
     updateDateTime();
     const clockInterval = setInterval(updateDateTime, 1000);
 
-    // Initial booking number calculation
-    resetToNextBookingNo();
+    // Booking number, patient master status, categories & active collectors in ONE request
+    loadBookingInit();
     
-    // Check patient master status
-    fetch(`${API_BASE}/api/master/patients/status`)
-      .then(res => res.json())
-      .then(data => setIsPatientImplemented(data.implemented))
-      .catch(err => console.error("Error checking patient table status:", err));
-
-    // Fetch categories with fallback
-    fetch(`${API_BASE}/api/master/categories`)
-      .then(res => res.json())
-      .then(data => {
-        setCategories(data || []);
-      })
-      .catch(err => {
-        console.error("Error fetching categories, using fallback:", err);
-        setCategories([{ Code: 'CG1', Descr: 'GENERAL' }]);
-      });
-
-    // Fetch collectors with fallback
-    fetch(`${API_BASE}/api/master/collectors?per_page=1000`)
-      .then(res => res.json())
-      .then(data => {
-        const loadedCollectors = data.data || [];
-        setCollectors(loadedCollectors.filter(c => Number(c.Status) === 1));
-      })
-      .catch(err => {
-        console.error("Error fetching collectors, using fallback:", err);
-        setCollectors([{ Code: 'CL000001', Descr: 'KHOKAN DAS', Status: 1 }]);
-      });
-
     codeRef.current?.focus();
 
     // Listen for storage events (e.g. from the Setup tab)
@@ -399,18 +422,25 @@ export default function NewBooking() {
       return;
     }
 
+    // Abort superseded requests so a slow older response can't overwrite newer results
+    const controller = new AbortController();
     const delayDebounceFn = setTimeout(() => {
-      fetch(`${API_BASE}/api/patients/search-name?search=${encodeURIComponent(patientName)}`)
+      fetch(`${API_BASE}/api/patients/search-name?search=${encodeURIComponent(patientName)}`, { signal: controller.signal })
         .then(res => res.json())
         .then(data => {
           setPatientNameResults(data || []);
           setShowPatientNameResults(data && data.length > 0);
           setActivePatientNameIndex(0);
         })
-        .catch(err => console.error("Error fetching patients by name:", err));
+        .catch(err => {
+          if (err.name !== 'AbortError') console.error("Error fetching patients by name:", err);
+        });
     }, 200);
 
-    return () => clearTimeout(delayDebounceFn);
+    return () => {
+      clearTimeout(delayDebounceFn);
+      controller.abort();
+    };
   }, [patientName, isPatientImplemented, patientCode]);
 
   useEffect(() => {
@@ -432,18 +462,24 @@ export default function NewBooking() {
       return;
     }
 
+    const controller = new AbortController();
     const delayDebounceFn = setTimeout(() => {
-      fetch(`${API_BASE}/api/patients/search-phone?phone=${encodeURIComponent(phone)}`)
+      fetch(`${API_BASE}/api/patients/search-phone?phone=${encodeURIComponent(phone)}`, { signal: controller.signal })
         .then(res => res.json())
         .then(data => {
           setPatientPhoneResults(data || []);
           setShowPatientPhoneResults(data && data.length > 0);
           setActivePatientPhoneIndex(0);
         })
-        .catch(err => console.error("Error fetching patients by phone:", err));
+        .catch(err => {
+          if (err.name !== 'AbortError') console.error("Error fetching patients by phone:", err);
+        });
     }, 200);
 
-    return () => clearTimeout(delayDebounceFn);
+    return () => {
+      clearTimeout(delayDebounceFn);
+      controller.abort();
+    };
   }, [phone, isPatientImplemented, patientCode]);
 
   const handleCodeKeyDown = (e) => {
@@ -569,7 +605,7 @@ export default function NewBooking() {
   const handleSaveNewPatient = (e) => {
     e?.preventDefault();
     if (!newName.trim()) {
-      alert("Please enter patient name.");
+      showAlert({ type: 'warning', title: 'Patient name required', message: 'Please enter patient name.' });
       return;
     }
     
@@ -675,8 +711,9 @@ export default function NewBooking() {
       return;
     }
 
+    const controller = new AbortController();
     const delayDebounceFn = setTimeout(() => {
-      fetch(`${API_BASE}/api/doctors?search=${encodeURIComponent(referredBy)}`)
+      fetch(`${API_BASE}/api/doctors?search=${encodeURIComponent(referredBy)}`, { signal: controller.signal })
         .then(res => res.json())
         .then(data => {
           setDrResults(data);
@@ -684,11 +721,14 @@ export default function NewBooking() {
           setActiveDrIndex(0);
         })
         .catch(err => {
-          console.error("Error fetching doctors:", err);
+          if (err.name !== 'AbortError') console.error("Error fetching doctors:", err);
         });
     }, 250);
 
-    return () => clearTimeout(delayDebounceFn);
+    return () => {
+      clearTimeout(delayDebounceFn);
+      controller.abort();
+    };
   }, [referredBy, selectedDoctor]);
 
   // Click outside to close doctor dropdown
@@ -702,16 +742,60 @@ export default function NewBooking() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch tests from API based on testSearch value
+  // Cached test catalogue for instant client-side search (refreshed every 5 min so rate changes appear)
+  const testCatalogueRef = useRef(null);
+
   useEffect(() => {
-    if (testSearch.trim().length < 2) {
+    let cancelled = false;
+    const loadCatalogue = () => {
+      fetch(`${API_BASE}/api/tests/catalogue`)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          if (!cancelled && Array.isArray(data)) testCatalogueRef.current = data;
+        })
+        .catch(err => console.error("Error loading test catalogue (using server search):", err));
+    };
+
+    loadCatalogue();
+    const refreshTimer = setInterval(loadCatalogue, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(refreshTimer);
+    };
+  }, []);
+
+  // Search tests: instant from the cached catalogue, server search as fallback
+  useEffect(() => {
+    const term = testSearch.trim();
+    if (term.length < 2) {
       setTestResults([]);
       setShowResults(false);
       return;
     }
 
+    const catalogue = testCatalogueRef.current;
+    if (catalogue) {
+      // Same rule as the server: name or code contains the term (case-insensitive), max 50
+      const q = term.toUpperCase();
+      const matches = [];
+      for (const t of catalogue) {
+        if (t.name.toUpperCase().includes(q) || t.code.toUpperCase().includes(q)) {
+          matches.push(t);
+          if (matches.length === 50) break;
+        }
+      }
+      setTestResults(matches);
+      setShowResults(true);
+      setActiveResultIndex(0);
+      return;
+    }
+
+    const controller = new AbortController();
     const delayDebounceFn = setTimeout(() => {
-      fetch(`${API_BASE}/api/tests?search=${encodeURIComponent(testSearch)}`)
+      fetch(`${API_BASE}/api/tests?search=${encodeURIComponent(testSearch)}`, { signal: controller.signal })
         .then(res => res.json())
         .then(data => {
           setTestResults(data);
@@ -719,11 +803,14 @@ export default function NewBooking() {
           setActiveResultIndex(0);
         })
         .catch(err => {
-          console.error("Error fetching tests:", err);
+          if (err.name !== 'AbortError') console.error("Error fetching tests:", err);
         });
     }, 250);
 
-    return () => clearTimeout(delayDebounceFn);
+    return () => {
+      clearTimeout(delayDebounceFn);
+      controller.abort();
+    };
   }, [testSearch]);
 
   // Click outside to close test dropdown
@@ -737,7 +824,8 @@ export default function NewBooking() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close any open modal on ESC press & Handle Alt+N / Alt+L shortcuts & Modal Up/Down/Enter Navigation
+  // Close any open modal on ESC press & Modal Up/Down/Enter Navigation
+  // (New Booking / Booking List shortcuts are handled in the local page shortcuts listener)
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       // 1. ESC Key: Close all modals instantly (using capture listener so even focused inputs trigger ESC!)
@@ -755,17 +843,7 @@ export default function NewBooking() {
         }
       }
 
-      // 2. Alt+N and Alt+L Shortcuts
-      if (e.altKey && (e.key === 'n' || e.key === 'N')) {
-        e.preventDefault();
-        handleClearForm();
-        return;
-      }
-      if (e.altKey && (e.key === 'l' || e.key === 'L')) {
-        e.preventDefault();
-        handleOpenExplorerModal();
-        return;
-      }
+      // 2. New Booking (Alt+N) / Booking List (Alt+L): see local page shortcuts listener (configurable via /shortcuts)
 
       // 3. Up/Down Arrow & Enter Navigation inside Booking List Explorer Modal
       if (showExplorerModal) {
@@ -1112,15 +1190,16 @@ export default function NewBooking() {
     fetchExplorerData({ from_date: fromStr, to_date: toStr, page: 1 });
   };
 
+  // Loads a saved booking into the form. Returns a Promise with the loaded booking data (or null).
   const handleLoadBookingFromExplorer = (item) => {
-    if (!item) return;
+    if (!item) return Promise.resolve(null);
     const rawBkNo = item.bookingNo || '';
     const serialStr = rawBkNo ? (rawBkNo.split('/').pop() || rawBkNo) : item.serialNo;
     setShowExplorerModal(false);
-    if (!serialStr) return;
+    if (!serialStr) return Promise.resolve(null);
     setBookingSerial(String(serialStr).padStart(5, '0'));
     
-    fetch(`${API_BASE}/api/booking/by-no/${serialStr}`)
+    return fetch(`${API_BASE}/api/booking/by-no/${serialStr}`)
       .then(res => res.json())
       .then(data => {
         if (data && !data.error) {
@@ -1169,12 +1248,14 @@ export default function NewBooking() {
           setTimeout(() => {
             codeRef.current?.focus();
           }, 80);
-        } else {
-          alert(`Could not load booking: ${data?.error || 'Booking data error'}`);
+          return data;
         }
+        showAlert({ type: 'error', title: 'Booking not loaded', message: `Could not load booking: ${data?.error || 'Booking data error'}` });
+        return null;
       })
       .catch(err => {
-        alert(`Error loading booking: ${err.message}`);
+        showAlert({ type: 'error', title: 'Booking not loaded', message: `Error loading booking: ${err.message}` });
+        return null;
       });
   };
 
@@ -1183,7 +1264,7 @@ export default function NewBooking() {
   const handleGenerateFinalInvoice = () => {
     const targetBkNo = savedBookingNo || bookingNo;
     if (!targetBkNo) {
-      alert("Please save or select a booking first.");
+      showAlert({ type: 'warning', title: 'No booking selected', message: 'Please save or select a booking first.' });
       return;
     }
 
@@ -1234,23 +1315,71 @@ export default function NewBooking() {
               setShowFinalInvoiceModal(true);
             });
         } else {
-          alert(data.error || "Failed to generate final invoice");
+          showAlert({ type: 'error', title: 'Invoice not generated', message: data.error || 'Failed to generate final invoice.' });
         }
       })
-      .catch(err => alert("Error generating final invoice"));
+      .catch(() => showAlert({ type: 'error', title: 'Invoice not generated', message: 'Error generating final invoice. Please check the backend connection and try again.' }));
+  };
+
+  // Writes the saved booking's receipt (as stored in the DB) into an already-open tab, with Print / Close buttons
+  const writeSavedBookingReceipt = (win, saved, patientType, printedBy) => {
+    const subtotalAmt = parseFloat(saved.subtotal) || 0;
+    const collAmt = parseFloat(saved.collectionCharge) || 0;
+    const procAmt = parseFloat(saved.procedureCharge) || 0;
+    const netAmt = parseFloat(saved.netAmount) || 0;
+    const paidAmt = parseFloat(saved.advAmount) || 0;
+
+    const htmlContent = generateA5BookingReceiptHTML({
+      bookingNo: saved.bookingNo,
+      bookingDate: saved.created_at_formatted || new Date().toLocaleString('en-GB'),
+      patientCode: saved.patientCode,
+      prefix: saved.prefix,
+      patientName: saved.patientName,
+      age: saved.age,
+      ageUnit: saved.ageUnit,
+      sex: saved.sex,
+      patientType,
+      phone: saved.phone,
+      address: saved.address,
+      referredBy: saved.referredBy,
+      selectedTests: saved.selectedTests || [],
+      totalAmount: subtotalAmt,
+      // Discount is stored as value + type; derive the amount from the backend formula: net = subtotal - discount + charges
+      discountAmount: Math.max(0, Math.round((subtotalAmt + collAmt + procAmt - netAmt) * 100) / 100),
+      collectionCharge: collAmt,
+      procedureCharge: procAmt,
+      grandTotal: netAmt,
+      advanceReceived: paidAmt,
+      balanceDue: Math.max(0, netAmt - paidAmt),
+      paymentMethod: saved.paymentMethod || 'Cash',
+      printedBy,
+      autoPrint: false,
+    });
+
+    win.document.open();
+    win.document.write(htmlContent);
+    win.document.close();
+    win.focus();
   };
 
   const handleSaveBooking = () => {
     if (!patientName.trim()) {
-      alert('Please enter patient name.');
-      nameRef.current?.focus();
+      showNoNameAlert();
       return;
     }
     if (selectedTests.length === 0) {
-      alert('Please select at least one test.');
-      searchRef.current?.focus();
+      showNoTestAlert();
       return;
     }
+
+    // Open the receipt tab now, while still inside the click / keyboard shortcut —
+    // browsers block pop-ups opened later, after the async save finishes
+    const receiptWindow = window.open('', '_blank');
+    if (receiptWindow) {
+      receiptWindow.document.write('<title>Saving booking…</title><div style="font-family:Segoe UI,Arial,sans-serif;padding:60px 20px;text-align:center;color:#475569;"><h2 style="color:#070a61;margin-bottom:8px;">Saving booking…</h2><p>The receipt will appear here in a moment.</p></div>');
+    }
+    const receiptPatientType = categories.find(c => c.Code === selectedCategory)?.Descr?.trim() || selectedCategory || 'GENERAL';
+    const receiptPrintedBy = activeUserSession?.user_name || 'Admin';
 
     const payload = {
       existingBookingNo: savedBookingNo || '',
@@ -1282,34 +1411,56 @@ export default function NewBooking() {
     })
       .then(res => res.json())
       .then(data => {
-        if (data.is_updated) {
-          alert(`Booking ${data.bookingNo} Updated Successfully!`);
-        } else {
-          alert(`New Web Booking Saved Successfully! Booking No: ${data.bookingNo}`);
+        if (!data || !data.bookingNo) {
+          receiptWindow?.close();
+          showAlert({ type: 'error', title: 'Save failed', message: data?.message || data?.error || 'Booking could not be saved. Please try again.' });
+          return;
         }
-        handleClearForm(); // Auto-reset form & load next fresh booking serial
+
+        // Stay on the saved booking (reloaded from DB: saved info, payment receipts, empty Received Amount),
+        // then fill the receipt tab from that same saved data. Clear Form starts the next booking.
+        handleLoadBookingFromExplorer({ bookingNo: data.bookingNo }).then(saved => {
+          if (!receiptWindow || receiptWindow.closed) return;
+          if (saved) {
+            writeSavedBookingReceipt(receiptWindow, saved, receiptPatientType, receiptPrintedBy);
+          } else {
+            receiptWindow.close();
+          }
+        });
+
+        const actionText = data.is_updated
+          ? `Booking ${data.bookingNo} updated successfully.`
+          : `New web booking ${data.bookingNo} saved successfully.`;
+        const receiptText = receiptWindow
+          ? 'The receipt has opened in a new tab with Print and Close buttons.'
+          : 'Pop-ups are blocked in this browser, so use Print Receipt to print.';
+
+        showAlert({
+          type: 'success',
+          title: data.is_updated ? 'Booking updated' : 'Booking saved',
+          message: `${actionText} ${receiptText} Press ${formatShortcut(shortcuts.NEW_BOOKING.key)} (New) for the next booking.`,
+        }).then(() => printReceiptBtnRef.current?.focus());
       })
       .catch(err => {
+        receiptWindow?.close();
         console.error("Error saving booking to database:", err);
-        alert("Error saving booking to database. Please check backend connection.");
+        showAlert({ type: 'error', title: 'Save failed', message: 'Error saving booking to database. Please check backend connection.' });
       });
   };
 
   const handlePrintBooking = () => {
     if (!patientName.trim()) {
-      alert('Please enter patient name.');
-      nameRef.current?.focus();
+      showNoNameAlert();
       return;
     }
     if (selectedTests.length === 0) {
-      alert('Please select at least one test.');
-      searchRef.current?.focus();
+      showNoTestAlert();
       return;
     }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Please allow pop-ups to print the booking receipt.');
+      showPopupBlockedAlert('booking receipt');
       return;
     }
 
@@ -1351,7 +1502,7 @@ export default function NewBooking() {
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Please allow pop-ups to print the final tax invoice.');
+      showPopupBlockedAlert('final tax invoice');
       return;
     }
 
@@ -1400,7 +1551,7 @@ export default function NewBooking() {
   const handlePrintPartPayment = (paymentRecord, partSeq, prevPaid = 0, cumulativePaid = 0) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Please allow pop-ups to print the part payment receipt.');
+      showPopupBlockedAlert('part payment receipt');
       return;
     }
 
@@ -1447,19 +1598,17 @@ export default function NewBooking() {
 
   const handlePrintDeptSlips = () => {
     if (!patientName.trim()) {
-      alert('Please enter patient name first.');
-      nameRef.current?.focus();
+      showNoNameAlert();
       return;
     }
     if (selectedTests.length === 0) {
-      alert('Please select at least one test.');
-      searchRef.current?.focus();
+      showNoTestAlert();
       return;
     }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Please allow pop-ups to print department slips.');
+      showPopupBlockedAlert('department slips');
       return;
     }
 
@@ -1536,7 +1685,7 @@ export default function NewBooking() {
       if (e.key === 'Enter') {
         e.preventDefault();
         if (selectedTests.length === 0) {
-          alert('Please select at least one test.');
+          showNoTestAlert();
           return;
         }
         discountValueRef.current?.focus();
@@ -1563,11 +1712,13 @@ export default function NewBooking() {
   const handleSaveBookingRef = useRef(handleSaveBooking);
   const handlePrintBookingRef = useRef(handlePrintBooking);
   const handleClearFormRef = useRef(handleClearForm);
+  const handleOpenExplorerModalRef = useRef(handleOpenExplorerModal);
 
   useEffect(() => {
     handleSaveBookingRef.current = handleSaveBooking;
     handlePrintBookingRef.current = handlePrintBooking;
     handleClearFormRef.current = handleClearForm;
+    handleOpenExplorerModalRef.current = handleOpenExplorerModal;
   });
 
   // Local Page shortcuts listener
@@ -1577,17 +1728,29 @@ export default function NewBooking() {
       
       if (combo === shortcuts.FOCUS_TEST_SEARCH.key) {
         e.preventDefault();
+        flashShortcut('FOCUS_TEST_SEARCH');
         searchRef.current?.focus();
         searchRef.current?.select();
       } else if (combo === shortcuts.SAVE_VOUCHER.key) {
         e.preventDefault();
+        flashShortcut('SAVE_VOUCHER');
         handleSaveBookingRef.current();
       } else if (combo === shortcuts.PRINT_INVOICE.key) {
         e.preventDefault();
+        flashShortcut('PRINT_INVOICE');
         handlePrintBookingRef.current();
       } else if (combo === shortcuts.CLEAR_FORM.key) {
         e.preventDefault();
+        flashShortcut('CLEAR_FORM');
         handleClearFormRef.current();
+      } else if (combo === shortcuts.NEW_BOOKING.key) {
+        e.preventDefault();
+        flashShortcut('NEW_BOOKING');
+        handleClearFormRef.current();
+      } else if (combo === shortcuts.OPEN_BOOKING_LIST.key) {
+        e.preventDefault();
+        flashShortcut('OPEN_BOOKING_LIST');
+        handleOpenExplorerModalRef.current();
       }
     };
 
@@ -1653,6 +1816,10 @@ export default function NewBooking() {
             <button
               type="button"
               onClick={handleClearForm}
+              className={styles.newBtn}
+              data-shortcut="NEW_BOOKING"
+              data-attention={savedBookingNo ? 'true' : undefined}
+              aria-keyshortcuts={formatShortcut(shortcuts.NEW_BOOKING.key).replace(/ /g, '')}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1668,10 +1835,12 @@ export default function NewBooking() {
                 boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
                 transition: 'all 0.2s ease'
               }}
-              title="Start New Booking (Alt + N)"
+              title={savedBookingNo
+                ? `Booking saved — start the next booking (${formatShortcut(shortcuts.NEW_BOOKING.key)})`
+                : `Start New Booking (${formatShortcut(shortcuts.NEW_BOOKING.key)})`}
             >
               <Plus size={16} />
-              <span>New</span>
+              <span><ShortcutLabel text="New" combo={shortcuts.NEW_BOOKING.key} /></span>
             </button>
 
             <button
@@ -1691,10 +1860,12 @@ export default function NewBooking() {
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
-              title="Open Industrial Booking List Explorer (Alt + L)"
+              data-shortcut="OPEN_BOOKING_LIST"
+              aria-keyshortcuts={formatShortcut(shortcuts.OPEN_BOOKING_LIST.key).replace(/ /g, '')}
+              title={`Open Industrial Booking List Explorer (${formatShortcut(shortcuts.OPEN_BOOKING_LIST.key)})`}
             >
               <ListFilter size={16} style={{ color: 'var(--primary)' }} />
-              <span>Booking List</span>
+              <span><ShortcutLabel text="Booking List" combo={shortcuts.OPEN_BOOKING_LIST.key} /></span>
               {explorerTotal > 0 && (
                 <span style={{
                   padding: '1px 6px',
@@ -2066,16 +2237,22 @@ export default function NewBooking() {
                 <FlaskConical size={20} />
                 <h3>Test Selection</h3>
               </div>
-              <button className={styles.legacyLink} onClick={handleClearForm} type="button">
-                <span><u>C</u>lear Form</span>
+              <button
+                className={styles.legacyLink}
+                onClick={handleClearForm}
+                type="button"
+                data-shortcut="CLEAR_FORM"
+                title={`Clear Form (${formatShortcut(shortcuts.CLEAR_FORM.key)})`}
+              >
+                <span><ShortcutLabel text="Clear Form" combo={shortcuts.CLEAR_FORM.key} /></span>
               </button>
             </div>
 
             {/* Test Search Autocomplete */}
             <label className="form-label" style={{ marginBottom: '6px', display: 'block' }}>
-              <u>F</u>ind / Search Tests
+              <ShortcutLabel text="Find / Search Tests" combo={shortcuts.FOCUS_TEST_SEARCH.key} />
             </label>
-            <div className={styles.searchBoxWrapper} ref={testContainerRef}>
+            <div className={styles.searchBoxWrapper} ref={testContainerRef} data-shortcut="FOCUS_TEST_SEARCH">
               <Search size={16} className={styles.searchIcon} />
               <input
                 ref={searchRef}
@@ -2591,6 +2768,8 @@ export default function NewBooking() {
                     moduleKey="booking"
                     action="can_add"
                     id="saveBtn"
+                    data-shortcut="SAVE_VOUCHER"
+                    title={`Save Booking (${formatShortcut(shortcuts.SAVE_VOUCHER.key)})`}
                     className={styles.saveInvoiceBtn}
                     onClick={handleSaveBooking}
                     onKeyDown={(e) => {
@@ -2603,11 +2782,13 @@ export default function NewBooking() {
                     type="button"
                   >
                     <Save size={18} />
-                    <span><u>S</u>ave Booking</span>
+                    <span><ShortcutLabel text="Save Booking" combo={shortcuts.SAVE_VOUCHER.key} /></span>
                   </PermissionButton>
                   <button 
                     ref={printReceiptBtnRef}
                     id="printBtn"
+                    data-shortcut="PRINT_INVOICE"
+                    title={`Print Receipt (${formatShortcut(shortcuts.PRINT_INVOICE.key)})`}
                     className={styles.printInvoiceBtn}
                     onClick={handlePrintBooking}
                     onKeyDown={(e) => {
@@ -2620,7 +2801,7 @@ export default function NewBooking() {
                     type="button"
                   >
                     <Printer size={18} />
-                    <span><u>P</u>rint Receipt</span>
+                    <span><ShortcutLabel text="Print Receipt" combo={shortcuts.PRINT_INVOICE.key} /></span>
                   </button>
                 </div>
                 <button

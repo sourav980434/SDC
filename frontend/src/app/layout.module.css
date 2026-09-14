@@ -669,3 +669,26 @@
   margin-left: auto;
   text-transform: uppercase;
 }
+
+/* Sidebar menu letter mode: after a menu key (Alt+M / R / U / O / Q) the open menu
+   highlights each item's accelerator letter until a letter, Esc or a click */
+.submenuKeyMode {
+  border-left-color: rgba(250, 204, 21, 0.65);
+}
+
+.submenuKeyMode .sublink u {
+  color: #1e1b4b;
+  background-color: #facc15;
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 800;
+}
+
+.keyModeHint {
+  padding: 2px 10px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fde68a;
+}
