@@ -223,10 +223,16 @@ export default function ArchiveBillsPage() {
               color: #888;
             }
             @media print {
+              @page {
+                size: portrait;
+                margin: 4mm 6mm;
+              }
               body {
                 border: none;
                 box-shadow: none;
                 padding: 10px;
+                width: 100%;
+                max-width: 198mm;
               }
             }
           </style>

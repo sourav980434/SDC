@@ -81,7 +81,7 @@ export function generateA5BookingReceiptHTML(data) {
   <title>Booking Receipt - ${bookingNo}</title>
   <style>
     @page {
-      size: A5 landscape;
+      size: portrait;
       margin: 4mm 6mm;
     }
     
@@ -97,8 +97,9 @@ export function generateA5BookingReceiptHTML(data) {
       color: #0f172a;
       font-size: 11px;
       line-height: 1.35;
-      padding: 6px 10px;
-      width: 210mm;
+      padding: 4px 6px;
+      width: 100%;
+      max-width: 198mm;
       margin: 0 auto;
     }
 
@@ -466,12 +467,12 @@ export function generateA5BookingReceiptHTML(data) {
 
     @media print {
       @page {
-        size: A5 landscape;
+        size: portrait;
         margin: 4mm 6mm;
       }
       html, body {
-        width: 210mm;
-        height: 148mm;
+        width: 100%;
+        max-width: 198mm;
         padding: 0;
       }
       .receipt-container {

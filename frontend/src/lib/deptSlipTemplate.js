@@ -210,7 +210,7 @@ export function generateA5DepartmentSlipsHTML(data) {
   <title>Department Work Slips - ${bookingNo}</title>
   <style>
     @page {
-      size: A5 landscape;
+      size: portrait;
       margin: 4mm 6mm;
     }
     
@@ -226,7 +226,8 @@ export function generateA5DepartmentSlipsHTML(data) {
       color: #0f172a;
       font-size: 11px;
       line-height: 1.35;
-      width: 210mm;
+      width: 100%;
+      max-width: 198mm;
       margin: 0 auto;
     }
 
@@ -367,11 +368,12 @@ export function generateA5DepartmentSlipsHTML(data) {
 
     @media print {
       @page {
-        size: A5 landscape;
+        size: portrait;
         margin: 4mm 6mm;
       }
       html, body {
-        width: 210mm;
+        width: 100%;
+        max-width: 198mm;
         padding: 0;
       }
       .receipt-container {
