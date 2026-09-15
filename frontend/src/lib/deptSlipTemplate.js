@@ -245,8 +245,13 @@ export function generateA5DepartmentSlipsHTML(data) {
     .receipt-container {
       border: 1.5px solid #0f172a;
       border-radius: 6px;
-      padding: 10px 14px;
+      padding: 14px 16px;
       position: relative;
+      min-height: 136mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
     }
 
     /* Header Section */
@@ -254,12 +259,12 @@ export function generateA5DepartmentSlipsHTML(data) {
       width: 100%;
       border-collapse: collapse;
       border-bottom: 1.5px solid #0f172a;
-      padding-bottom: 6px;
-      margin-bottom: 8px;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
     }
 
     .org-title {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 900;
       color: #070a61;
       letter-spacing: -0.2px;
@@ -267,10 +272,10 @@ export function generateA5DepartmentSlipsHTML(data) {
     }
 
     .org-subtitle {
-      font-size: 10px;
+      font-size: 10.5px;
       color: #475569;
       font-weight: 600;
-      margin-top: 1px;
+      margin-top: 2px;
     }
 
     .voucher-title-box {
@@ -278,9 +283,9 @@ export function generateA5DepartmentSlipsHTML(data) {
     }
 
     .voucher-title {
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 900;
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 4px;
       border: 1px solid #cbd5e1;
       display: inline-block;
@@ -288,8 +293,8 @@ export function generateA5DepartmentSlipsHTML(data) {
     }
 
     .qr-box {
-      width: 52px;
-      height: 52px;
+      width: 54px;
+      height: 54px;
       border: 1px solid #cbd5e1;
       border-radius: 4px;
       padding: 2px;
@@ -299,16 +304,16 @@ export function generateA5DepartmentSlipsHTML(data) {
     .meta-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 4px;
     }
 
     .meta-table td {
-      padding: 4px 8px;
-      font-size: 10.5px;
-      vertical-align: top;
+      padding: 5.5px 10px;
+      font-size: 11px;
+      vertical-align: middle;
     }
 
     .meta-label {
@@ -326,21 +331,22 @@ export function generateA5DepartmentSlipsHTML(data) {
     .test-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
+      flex-grow: 1;
     }
 
     .test-table th {
       color: #ffffff;
-      padding: 5px 8px;
-      font-size: 10px;
+      padding: 7px 10px;
+      font-size: 11px;
       font-weight: 800;
       text-transform: uppercase;
       text-align: left;
     }
 
     .test-table td {
-      padding: 5.5px 8px;
-      font-size: 10.5px;
+      padding: 7px 10px;
+      font-size: 11.5px;
       border: 1px solid #e2e8f0;
       color: #1e293b;
     }
@@ -352,12 +358,12 @@ export function generateA5DepartmentSlipsHTML(data) {
     /* Footer Notes */
     .footer-section {
       border-top: 1.5px solid #0f172a;
-      padding-top: 6px;
-      margin-top: 10px;
+      padding-top: 8px;
+      margin-top: auto;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      font-size: 9px;
+      font-size: 9.5px;
       color: #64748b;
     }
 
@@ -378,6 +384,7 @@ export function generateA5DepartmentSlipsHTML(data) {
       }
       .receipt-container {
         border-color: #000000;
+        min-height: 136mm;
       }
       .no-print {
         display: none !important;

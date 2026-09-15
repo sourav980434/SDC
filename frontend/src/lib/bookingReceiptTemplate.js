@@ -107,8 +107,13 @@ export function generateA5BookingReceiptHTML(data) {
     .receipt-container {
       border: 1.5px solid #0f172a;
       border-radius: 6px;
-      padding: 10px 14px;
+      padding: 14px 16px;
       position: relative;
+      min-height: 136mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
     }
 
     /* Circular Rubber Stamp Seal Watermark */
@@ -181,12 +186,12 @@ export function generateA5BookingReceiptHTML(data) {
       width: 100%;
       border-collapse: collapse;
       border-bottom: 1.5px solid #0f172a;
-      padding-bottom: 6px;
-      margin-bottom: 8px;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
     }
 
     .org-title {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 900;
       color: #070a61;
       letter-spacing: -0.2px;
@@ -194,10 +199,10 @@ export function generateA5BookingReceiptHTML(data) {
     }
 
     .org-subtitle {
-      font-size: 10px;
+      font-size: 10.5px;
       color: #475569;
       font-weight: 600;
-      margin-top: 1px;
+      margin-top: 2px;
     }
 
     .voucher-title-box {
@@ -205,20 +210,20 @@ export function generateA5BookingReceiptHTML(data) {
     }
 
     .voucher-title {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 900;
       color: #070a61;
       background: #e0e7ff;
       border: 1px solid #c7d2fe;
-      padding: 3px 10px;
+      padding: 4px 12px;
       border-radius: 4px;
       display: inline-block;
       text-transform: uppercase;
     }
 
     .qr-box {
-      width: 52px;
-      height: 52px;
+      width: 54px;
+      height: 54px;
       border: 1px solid #cbd5e1;
       border-radius: 4px;
       padding: 2px;
@@ -228,16 +233,16 @@ export function generateA5BookingReceiptHTML(data) {
     .meta-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 4px;
     }
 
     .meta-table td {
-      padding: 4px 8px;
-      font-size: 10.5px;
-      vertical-align: top;
+      padding: 5.5px 10px;
+      font-size: 11px;
+      vertical-align: middle;
     }
 
     .meta-label {
@@ -253,9 +258,9 @@ export function generateA5BookingReceiptHTML(data) {
 
     .status-stamp {
       display: inline-block;
-      padding: 2px 8px;
+      padding: 2.5px 10px;
       border-radius: 12px;
-      font-size: 8.5px;
+      font-size: 9px;
       font-weight: 800;
       background: ${badgeBg};
       color: ${badgeColor};
@@ -268,14 +273,15 @@ export function generateA5BookingReceiptHTML(data) {
     .test-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
+      flex-grow: 1;
     }
 
     .test-table th {
       background: #070a61;
       color: #ffffff;
-      padding: 5px 8px;
-      font-size: 10px;
+      padding: 7px 10px;
+      font-size: 11px;
       font-weight: 800;
       text-transform: uppercase;
       text-align: left;
@@ -283,8 +289,8 @@ export function generateA5BookingReceiptHTML(data) {
     }
 
     .test-table td {
-      padding: 5px 8px;
-      font-size: 10.5px;
+      padding: 7px 10px;
+      font-size: 11.5px;
       border: 1px solid #e2e8f0;
       color: #1e293b;
     }
@@ -297,27 +303,27 @@ export function generateA5BookingReceiptHTML(data) {
     .summary-wrapper {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 4px;
-      margin-bottom: 8px;
+      margin-top: auto;
+      margin-bottom: 10px;
     }
 
     .summary-left {
-      width: 58%;
+      width: 56%;
       vertical-align: top;
       padding-right: 12px;
     }
 
     .summary-right {
-      width: 42%;
+      width: 44%;
       vertical-align: top;
     }
 
     .words-box {
       background: #f1f5f9;
       border: 1px dashed #cbd5e1;
-      padding: 6px 10px;
+      padding: 7px 12px;
       border-radius: 4px;
-      font-size: 10px;
+      font-size: 10.5px;
       color: #334155;
       margin-bottom: 6px;
     }
@@ -327,9 +333,9 @@ export function generateA5BookingReceiptHTML(data) {
       background: #fef3c7;
       border: 1px solid #f59e0b;
       color: #92400e;
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 4px;
-      font-size: 10px;
+      font-size: 10.5px;
       font-weight: 800;
     }
 
@@ -337,11 +343,11 @@ export function generateA5BookingReceiptHTML(data) {
       background: #eff6ff;
       border: 1px solid #bfdbfe;
       color: #1e40af;
-      padding: 4px 8px;
+      padding: 5px 10px;
       border-radius: 4px;
-      font-size: 9.5px;
+      font-size: 10px;
       font-weight: 700;
-      margin-top: 4px;
+      margin-top: 6px;
     }
 
     .calc-table {
@@ -350,8 +356,8 @@ export function generateA5BookingReceiptHTML(data) {
     }
 
     .calc-table td {
-      padding: 3px 6px;
-      font-size: 10.5px;
+      padding: 3.5px 6px;
+      font-size: 11px;
     }
 
     .calc-label {
@@ -364,7 +370,7 @@ export function generateA5BookingReceiptHTML(data) {
       text-align: right;
       font-weight: 700;
       font-family: monospace;
-      font-size: 11px;
+      font-size: 11.5px;
     }
 
     .calc-highlight {
@@ -375,18 +381,19 @@ export function generateA5BookingReceiptHTML(data) {
 
     .calc-due {
       color: #b91c1c;
-      font-size: 12px;
+      font-size: 12.5px;
       font-weight: 900;
     }
 
     /* Footer Notes */
     .footer-section {
       border-top: 1.5px solid #0f172a;
-      padding-top: 6px;
+      padding-top: 8px;
+      margin-top: 4px;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      font-size: 9px;
+      font-size: 9.5px;
       color: #64748b;
     }
 
@@ -477,6 +484,7 @@ export function generateA5BookingReceiptHTML(data) {
       }
       .receipt-container {
         border-color: #000000;
+        min-height: 136mm;
       }
       .no-print {
         display: none !important;
