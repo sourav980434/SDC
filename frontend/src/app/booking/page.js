@@ -41,6 +41,7 @@ import { generateA5BillReceiptHTML } from '@/lib/billReceiptTemplate';
 import { generateA5PartPaymentReceiptHTML } from '@/lib/partPaymentReceiptTemplate';
 import { generateA5DepartmentSlipsHTML } from '@/lib/deptSlipTemplate';
 import { fetchLabSettings, getCachedLabSettings } from '@/lib/labSettings';
+import SearchableSelect from '@/components/SearchableSelect';
 
 export default function NewBooking() {
   const searchParams = useSearchParams();
@@ -2196,7 +2197,7 @@ export default function NewBooking() {
               {/* Patient Category */}
               <div className={`${styles.colSpan2} form-group`}>
                 <label className="form-label">Patient Category</label>
-                <select
+                <SearchableSelect
                   ref={categoryRef}
                   className="form-input"
                   value={selectedCategory}
@@ -2207,13 +2208,13 @@ export default function NewBooking() {
                   {categories.map(cat => (
                     <option key={cat.Code} value={cat.Code}>{cat.Descr}</option>
                   ))}
-                </select>
+                </SearchableSelect>
               </div>
 
               {/* Collector */}
               <div className={`${styles.colSpan2} form-group`}>
                 <label className="form-label">Collector</label>
-                <select
+                <SearchableSelect
                   ref={collectorRef}
                   className="form-input"
                   value={selectedCollector}
@@ -2225,7 +2226,7 @@ export default function NewBooking() {
                   {collectors.map(col => (
                     <option key={col.Code} value={col.Code}>{col.Descr}</option>
                   ))}
-                </select>
+                </SearchableSelect>
               </div>
             </div>
           </div>

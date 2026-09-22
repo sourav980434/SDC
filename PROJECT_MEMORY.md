@@ -13,6 +13,7 @@ When you introduce a new shared component or pattern, add a numbered section bel
 | 1 | [Alert Dialog instead of `window.alert()`](#1-alert-dialog-instead-of-windowalert) | All frontend pages | 13-Sep-2026 |
 | 2 | [Backend Performance Rules](#2-backend-performance-rules) | All APIs & data-loading pages | 13-Sep-2026 |
 | 3 | [Keyboard Shortcut Buttons (underline + flash)](#3-keyboard-shortcut-buttons-underline--flash) | Any button / link with a shortcut | 13-Sep-2026 |
+| 4 | [Searchable dropdowns (`SearchableSelect`)](#4-searchable-dropdowns-searchableselect) | Any dropdown filled from the database | 22-Sep-2026 |
 
 ---
 
@@ -195,10 +196,38 @@ Like the customer's old desktop software (`&Master`, `&Transaction`): press the 
 | Menu (key) | Items → letter |
 |---|---|
 | **Dashboard** (Alt+D) | Direct link at the top of the sidebar — opens the Dashboard immediately (no letter step) |
-| **Master** (Alt+M) | Doctor List **D** · Test Rate List **T** · Category List **C** · Patient List **P** · Department Details **E** · Sub Department **S** · Marketing Executive **M** · Collector Details **L** |
+| **Master** (Alt+M) | Doctor List **D** · Test Rate List **T** · Category List **C** · Patient List **P** · Department Details **E** · Sub Department **S** · Marketing Executive **M** · Collector Details **L** · Report Template **R** |
 | **Transaction** (Alt+R) | Booking / Advance **B** · Archive Bills **A** · Bill / Invoice **I** |
 | **SetUp** (Alt+U) | Lab & Report Settings **L** · User Management **U** · Permission Matrix **P** · System Audit Trail **A** · Configure Shortcuts **C** |
 | **Report Print** (Alt+O) | (coming soon — no letters yet) |
 | **Report/Query** (Alt+Q) | Sample Tracking **S** · Lab Result Entry **R** · Pathology Verification **V** · Pending Test Register **T** |
 
 **Adding a sidebar page:** add it to `MENU_GROUPS` in [components/Sidebar.js](frontend/src/components/Sidebar.js) with a `letter` that is unique inside its group and appears in the label (and `module` for permission). The expanded menu, collapsed flyout, underline, tooltip and keyboard handling all come from that one entry.
+
+---
+
+## 4. Searchable dropdowns (`SearchableSelect`)
+
+### Rule
+Any dropdown whose options come from the database (doctors, departments, sub-departments, categories, collectors, roles, ...) uses the shared **`SearchableSelect`** instead of a plain `<select>`. Short fixed lists (Mr./Mrs., Male/Female, Active/Inactive, Yrs/Mo, %/₹) stay native `<select>`.
+
+### Files
+- Component: [frontend/src/components/SearchableSelect.js](frontend/src/components/SearchableSelect.js)
+- Styles: [frontend/src/components/SearchableSelect.module.css](frontend/src/components/SearchableSelect.module.css)
+
+### Usage
+Drop-in: rename `<select>` / `</select>` to `<SearchableSelect>` / `</SearchableSelect>` — same `value`, `onChange` (`e.target.value`), `<option>` children, `className`, `style`, `disabled`, `required`, `onKeyDown` and `ref`.
+```jsx
+import SearchableSelect from '@/components/SearchableSelect';
+
+<SearchableSelect className={styles.formSelect} value={deptCode} onChange={e => setDeptCode(e.target.value)} required>
+  <option value="">-- Select --</option>
+  {departments.map(d => <option key={d.Code} value={d.Code}>{d.Descr}</option>)}
+</SearchableSelect>
+```
+
+### Behaviour
+- Type to filter (every word must match the label or value), ArrowUp/Down to move, **Enter** picks, **Esc** closes.
+- Enter picks the highlighted option **and** is then passed to `onKeyDown`, so "Enter → next field" forms (Booking) keep working.
+- The list is portalled to `<body>` — never clipped by cards, tables or modals.
+

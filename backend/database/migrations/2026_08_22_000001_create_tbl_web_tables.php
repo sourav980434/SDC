@@ -87,6 +87,8 @@ return new class extends Migration
                 if (!Schema::hasColumn('tbl_web_booking_dtl', 'result_entered_by')) $table->string('result_entered_by', 50)->nullable();
                 if (!Schema::hasColumn('tbl_web_booking_dtl', 'verified_at')) $table->dateTime('verified_at')->nullable();
                 if (!Schema::hasColumn('tbl_web_booking_dtl', 'verified_by')) $table->string('verified_by', 50)->nullable();
+                if (!Schema::hasColumn('tbl_web_booking_dtl', 'narrative_html')) $table->longText('narrative_html')->nullable();
+                if (!Schema::hasColumn('tbl_web_booking_dtl', 'report_template_file')) $table->string('report_template_file', 255)->nullable();
             });
         }
 

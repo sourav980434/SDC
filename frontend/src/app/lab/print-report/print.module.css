@@ -89,3 +89,19 @@
     width: 100% !important;
   }
 }
+
+/* Filled Word template (rt-doc): no card or extra padding - Word's own layout */
+.templateDoc {
+  color: #000000;
+  margin-bottom: 16px;
+  overflow-wrap: break-word;
+}
+
+/* Reports saved before the fix still carry Word's "page:WordSection1" - neutralise it */
+.templateDoc :global(*) {
+  page: auto !important;
+}
+
+.templateDoc :global(table) {
+  max-width: 100%;
+}

@@ -1,5 +1,6 @@
 import { numberToWords, generateReportPin } from './numberToWords';
 import { getCachedLabSettings } from './labSettings';
+import { getAppOrigin } from './apiConfig';
 
 export function generateA5BookingReceiptHTML(data) {
   const labConfig = getCachedLabSettings() || {};
@@ -70,7 +71,7 @@ export function generateA5BookingReceiptHTML(data) {
 
   // QR Code URL for Live Report Tracking
   const qrTrackingUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(
-    `http://192.168.0.11:3000/report-status?bk=${bookingNo}`
+    `${getAppOrigin()}/report-status?bk=${bookingNo}`
   )}`;
 
   return `

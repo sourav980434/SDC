@@ -7,6 +7,8 @@ frontend/build/
 
 # PHP / Laravel
 backend/.env
+backend/.env_*
+backend/.env.old
 backend/storage/*.key
 
 # Environment

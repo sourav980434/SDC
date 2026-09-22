@@ -9,6 +9,7 @@ import API_BASE from '@/lib/apiConfig';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { AlertTriangle } from 'lucide-react';
 import { useAlert } from '@/components/AlertDialog';
+import SearchableSelect from '@/components/SearchableSelect';
 
 export default function DoctorMaster() {
   const router = useRouter();
@@ -450,7 +451,7 @@ export default function DoctorMaster() {
           {/* Department I & II */}
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Department I</label>
-            <select
+            <SearchableSelect
               className={styles.formSelect}
               value={deptCode}
               onChange={e => setDeptCode(e.target.value)}
@@ -460,12 +461,12 @@ export default function DoctorMaster() {
               {departments.map(dept => (
                 <option key={dept.Code} value={dept.Code}>{dept.Descr}</option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
 
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Department II</label>
-            <select
+            <SearchableSelect
               className={styles.formSelect}
               value={deptCode2}
               onChange={e => setDeptCode2(e.target.value)}
@@ -475,7 +476,7 @@ export default function DoctorMaster() {
               {departments.map(dept => (
                 <option key={dept.Code} value={dept.Code}>{dept.Descr}</option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
 
           {/* Residential Info */}

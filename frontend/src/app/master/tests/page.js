@@ -7,6 +7,7 @@ import styles from '../master.module.css';
 
 import API_BASE from '@/lib/apiConfig';
 import { useAlert } from '@/components/AlertDialog';
+import SearchableSelect from '@/components/SearchableSelect';
 
 export default function TestMaster() {
   const router = useRouter();
@@ -289,7 +290,7 @@ export default function TestMaster() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
           <div className={styles.formGroup}>
             <label className={styles.formLabel} style={{ fontSize: '11px', color: 'var(--outline)' }}>Dept Filter</label>
-            <select 
+            <SearchableSelect 
               className={styles.formSelect} 
               value={listDeptFilter} 
               onChange={e => {
@@ -302,12 +303,12 @@ export default function TestMaster() {
               {departments.map(d => (
                 <option key={trim(d.Code)} value={trim(d.Code)}>{trim(d.Descr)}</option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
           
           <div className={styles.formGroup}>
             <label className={styles.formLabel} style={{ fontSize: '11px', color: 'var(--outline)' }}>Sub Dept Filter</label>
-            <select 
+            <SearchableSelect 
               className={styles.formSelect} 
               value={listSubDeptFilter} 
               onChange={e => {
@@ -319,7 +320,7 @@ export default function TestMaster() {
               {filterListSubDeps.map(sd => (
                 <option key={trim(sd.Code)} value={trim(sd.Code)}>{trim(sd.Descr)}</option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
         </div>
         
@@ -444,7 +445,7 @@ export default function TestMaster() {
           {/* Department */}
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Department</label>
-            <select
+            <SearchableSelect
               className={styles.formSelect}
               value={deptCode}
               onChange={e => {
@@ -458,13 +459,13 @@ export default function TestMaster() {
               {departments.map(dept => (
                 <option key={trim(dept.Code)} value={trim(dept.Code)}>{trim(dept.Descr)}</option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
 
           {/* Sub Department */}
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Sub Department</label>
-            <select
+            <SearchableSelect
               className={styles.formSelect}
               value={subDeptCode}
               onChange={e => setSubDeptCode(e.target.value)}
@@ -475,7 +476,7 @@ export default function TestMaster() {
               {filteredSubDeps.map(sd => (
                 <option key={trim(sd.Code)} value={trim(sd.Code)}>{trim(sd.Descr)}</option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
 
           {/* Name */}

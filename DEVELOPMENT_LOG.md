@@ -329,6 +329,30 @@
 
 ---
 
+### ৫০. Word রিপোর্ট টেমপ্লেট এডিটর (REPORT_MASTER Word Report Templates — 21-Sep-2026)
+* **উদ্দেশ্য:** পুরনো সফটওয়্যারের মতোই — টেস্টের Word টেমপ্লেট খুলে রেজাল্ট বসিয়ে প্রিন্ট; তবে এখন ব্রাউজারের ভেতরেই Word-এর মতো এডিটরে।
+* **টেমপ্লেট ফোল্ডার:** `backend/storage/app/REPORT_MASTER` (git-এ নেই — নতুন PC-তে হাতে কপি করতে হবে)। পাথ `.env`-এর `REPORT_TEMPLATE_PATH` থেকে বদলানো যায়।
+* **অটো-লিঙ্ক:** ফাইলের নাম থেকেই টেস্ট কোড — `T0000006_D0000390_xxx.dot` → টেস্ট `T0000006`, ভ্যারিয়েন্ট `D0000390`; `U0000003_T0000010_xxx.dot` → ইউজারের নিজস্ব টেমপ্লেট। নামহীন ফাইল (`1.dot`, `echo.dot` ইত্যাদি) লিঙ্ক হয় না। সবচেয়ে নতুন ফাইল ডিফল্ট।
+* **কনভার্শন:** সার্ভার PC-র **Microsoft Word** (COM, `backend/resources/scripts/doc2html.ps1`) দিয়ে `.dot` → HTML, `storage/app/private/report_template_cache`-এ ক্যাশ (ফাইল বদলালে আবার কনভার্ট)। Word না থাকলে এডিটরে "Microsoft Word Required" অ্যালার্ট দেখায়।
+* **আগে থেকে কনভার্ট:** `php artisan report-templates:warm` — সব টেমপ্লেট একবারে কনভার্ট করে, যাতে প্রথমবার খুলতে দেরি না হয়।
+* **নতুন APIs:** `GET /api/report-templates/status`, `GET /api/report-templates/lookup?codes=`, `GET /api/report-templates?test_code=`, `GET /api/report-templates/content?file=`, `POST /api/sample-tracking/save-narrative`।
+* **ডাটাবেস:** শুধু পূরণ করা রিপোর্ট সেভ হয় — `tbl_web_booking_dtl.narrative_html` ও `report_template_file` (কলাম না থাকলে প্রথম সেভে নিজে থেকে তৈরি হয়)।
+* **ফ্রন্টএন্ড:** Result Entry-তে টেমপ্লেটওয়ালা টেস্টে **Write/Open Report** বাটন → `/lab/report-editor` (A4 পাতা, পেশেন্ট ডিটেইলস অটো, `0.00` ঘর হলুদ — **Tab** দিয়ে পরের ঘরে, Ctrl+S সেভ, Ctrl+P সেভ ও প্রিন্ট)। Print Report পেজে `itemId` দিলে শুধু সেই টেস্ট প্রিন্ট হয়।
+
+---
+
+### ৫১. Report Template মাস্টার পেজ (Master → Report Template — 22-Sep-2026)
+* **পেজ:** `/master/report-templates` (সাইডবার Master → **Report Template**, অক্ষর `r`)। বাম দিকে সব টেস্ট ও প্রতিটির টেমপ্লেট সংখ্যা (All / With / Without ফিল্টার), ডান দিকে নির্বাচিত টেস্টের টেমপ্লেট তালিকা।
+* **কাজ:** Preview (Word দিয়ে কনভার্ট করে দেখায়), Download (Word-এ এডিট করার জন্য), **Set Default**, Remove, এবং নতুন `.dot/.doc/.dotx/.docx` **Upload** — ফাইল নিজে থেকেই সঠিক নামে (`T<test>_D<variant>_<time>`) `REPORT_MASTER`-এ সেভ হয়।
+* **ডিফল্ট:** `REPORT_MASTER/_defaults.json`-এ থাকে; না থাকলে সবচেয়ে নতুন ফাইল ডিফল্ট।
+* **Remove:** ফাইল মুছে যায় না — `REPORT_MASTER/_deleted`-এ সরে যায়।
+* **Replace (বিদ্যমান টেমপ্লেট আপডেট):** Download → Word-এ এডিট → **Replace** বাটন। একই নাম, ডাক্তার ও ডিফল্ট থাকে; পুরনো ফাইল `REPORT_MASTER/_versions`-এ ব্যাকআপ হয়। আগে সেভ হওয়া পেশেন্ট রিপোর্ট বদলায় না। API: `POST /api/report-templates/replace` (`template`, `file`)।
+* **APIs:** `GET /api/report-templates/overview`, `POST /api/report-templates/upload`, `POST /api/report-templates/set-default`, `POST /api/report-templates/delete`, `GET /api/report-templates/download`।
+* **খেয়াল রাখুন:** PHP-র `upload_max_filesize` (বর্তমানে 2M) ও `post_max_size` (8M) এর চেয়ে বড় ফাইল আপলোড হবে না — বড় টেমপ্লেটের জন্য `php.ini`-তে বাড়াতে হবে।
+* **ফিক্স:** `php artisan serve` চাইল্ড প্রসেসে Windows env ভ্যারিয়েবল দেয় না — PowerShell/Word চালানোর সময় `SystemRoot`, `TEMP` ইত্যাদি আলাদা করে দেওয়া হয় (`ReportTemplateService::windowsEnv()`)। প্রিন্টে Word-এর `page:WordSection1` বাদ দেওয়া হয়, যাতে রিপোর্ট আলাদা পাতায় না ভাঙে।
+
+---
+
 ## 📋 ভবিষ্যৎ করণীয় এবং পরবর্তী ধাপসমূহ (Next Steps)
 ১. **ডক্টর commission ও সেলসম্যান ইনসেনটিভ সিস্টেম:** রেফারকারী ডাক্তার ও কালেক্টরদের পার্সেন্টেজ হিসাবের রিপোর্ট।
 ২. **অন্যান্য নিষ্ক্রিয় মেনু সম্প্রসারণ:** সাইডবারের বাকি নিষ্ক্রিয় সাব-লিঙ্কগুলো ধারাবাহিকভাবে তৈরি করা।

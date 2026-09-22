@@ -6,6 +6,7 @@ import { UserPlus, Edit3, Shield, Key, Check, X, Building2, LayoutGrid, Sparkles
 
 import API_BASE from '@/lib/apiConfig';
 import { SYSTEM_MODULES } from '@/lib/modulesConfig';
+import SearchableSelect from '@/components/SearchableSelect';
 export default function UserManagementPage() {
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -428,7 +429,7 @@ export default function UserManagementPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--on-surface-variant)' }}>System Role</label>
-                  <select
+                  <SearchableSelect
                     value={roleCode}
                     onChange={(e) => setRoleCode(e.target.value)}
                     style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--outline-variant)', fontSize: '13.5px' }}
@@ -436,7 +437,7 @@ export default function UserManagementPage() {
                     {roles.map(r => (
                       <option key={r.role_code} value={r.role_code}>{r.role_name}</option>
                     ))}
-                  </select>
+                  </SearchableSelect>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

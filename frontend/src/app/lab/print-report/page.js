@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import { Printer, ArrowLeft, ShieldCheck } from 'lucide-react';
 import styles from './print.module.css';
@@ -11,11 +12,15 @@ import { fetchLabSettings, DEFAULT_LAB_CONFIG } from '@/lib/labSettings';
 function PrintReportContent() {
   const searchParams = useSearchParams();
   const bookingId = searchParams.get('bookingId');
+  const itemId = searchParams.get('itemId'); // print only this test line (from the report editor)
 
   const [reportData, setReportData] = useState(null);
   const [labCfg, setLabCfg] = useState(DEFAULT_LAB_CONFIG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     fetchLabSettings().then(cfg => setLabCfg(cfg));
@@ -67,15 +72,27 @@ function PrintReportContent() {
     );
   }
 
-  const { header, test_items } = reportData;
+  const { header } = reportData;
+  const test_items = itemId
+    ? reportData.test_items.filter(it => String(it.id) === String(itemId))
+    : reportData.test_items;
 
   const pathologyItems = test_items.filter(it => it.result_json && it.result_json.length > 0);
   const narrativeItems = test_items.filter(it => it.narrative_html || (!it.result_json || it.result_json.length === 0));
 
-  return (
-    <div className={styles.pageWrapper}>
+  // Word template reports already carry their own department heading, test title and doctor signature
+  const isTemplateDoc = (it) => !!it.narrative_html && it.narrative_html.includes('rt-doc');
+  const templateItems = narrativeItems.filter(isTemplateDoc);
+  const otherNarrativeItems = narrativeItems.filter(it => !isTemplateDoc(it));
+  const onlyTemplateDocs = templateItems.length > 0 && pathologyItems.length === 0 && otherNarrativeItems.length === 0;
+
+  // Rendered straight into <body> (outside sidebar / header / scroll container) so only the report prints, on as many pages as needed
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="report-print-root">
       {/* Top Action Bar (Screen Only) */}
-      <div className={`${styles.actionBar} no-print`}>
+      <div className={`${styles.toolbar} no-print`}>
         <button onClick={() => window.history.back()} className={styles.backBtn}>
           <ArrowLeft size={16} /> Back
         </button>
@@ -177,14 +194,24 @@ function PrintReportContent() {
             </div>
           )}
 
-          {/* 4. Radiology & Narrative Impression Tests */}
-          {narrativeItems.length > 0 && (
+          {/* 4. Word template reports - printed as designed, each test on its own page */}
+          {templateItems.map((it, idx) => (
+            <div
+              key={it.id}
+              className={styles.templateDoc}
+              style={{ pageBreakBefore: idx > 0 || pathologyItems.length > 0 ? 'always' : 'auto' }}
+              dangerouslySetInnerHTML={{ __html: it.narrative_html }}
+            />
+          ))}
+
+          {/* 5. Radiology & Narrative Impression Tests */}
+          {otherNarrativeItems.length > 0 && (
             <div style={{ marginBottom: '24px' }}>
               <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', borderBottom: '1.5px solid #0f172a', paddingBottom: '4px', marginBottom: '12px' }}>
                 RADIOLOGY & DESCRIPTIVE REPORT FINDINGS
               </div>
 
-              {narrativeItems.map(it => (
+              {otherNarrativeItems.map(it => (
                 <div key={it.id} style={{ marginBottom: '20px', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '14px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', margin: '0 0 10px 0', borderBottom: '1px solid #cbd5e1', paddingBottom: '6px' }}>
                     {it.test_name} ({it.test_code})
@@ -204,9 +231,9 @@ function PrintReportContent() {
             </div>
           )}
 
-          {/* 5. Dynamic Footer Signatures & Disclaimer */}
+          {/* 6. Dynamic Footer Signatures & Disclaimer (template reports carry their own signature) */}
           <div style={{ marginTop: '40px', borderTop: '1.5px solid #cbd5e1', paddingTop: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', textAlign: 'center', fontSize: '11px', marginBottom: '20px' }}>
+            <div style={{ display: onlyTemplateDocs ? 'none' : 'flex', justifyContent: 'space-between', textAlign: 'center', fontSize: '11px', marginBottom: '20px' }}>
               {(labCfg.report_signatories || []).map((sig, idx) => (
                 <div key={idx}>
                   <div style={{ height: '40px' }}></div>
@@ -223,7 +250,8 @@ function PrintReportContent() {
 
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

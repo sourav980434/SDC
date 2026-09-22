@@ -29,11 +29,19 @@ if %errorlevel% neq 0 goto :NO_NODE
 if not exist "%ROOT_DIR%frontend\node_modules" goto :INSTALL_FRONTEND
 
 :START_SERVERS
-:: Dynamically detect IPv4 address
-set "LOCAL_IP=127.0.0.1"
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
-    for /f "tokens=1" %%b in ("%%a") do set "LOCAL_IP=%%b"
+:: Detect the LAN IPv4 address - the adapter carrying the default route (Wi-Fi / Ethernet),
+:: so virtual adapters like Hyper-V / WSL "vEthernet (172.x.x.x)" are never picked
+set "LOCAL_IP="
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -First 1 | Get-NetIPAddress -AddressFamily IPv4).IPAddress" 2^>nul`) do (
+    if not defined LOCAL_IP set "LOCAL_IP=%%i"
 )
+:: Fallback when there is no network: first IPv4 from ipconfig, else localhost
+if not defined LOCAL_IP (
+    for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
+        if not defined LOCAL_IP for /f "tokens=1" %%b in ("%%a") do set "LOCAL_IP=%%b"
+    )
+)
+if not defined LOCAL_IP set "LOCAL_IP=127.0.0.1"
 
 :: Launch Backend & Frontend in 100% hidden background (zero CMD windows)
 wscript.exe "%~dp0start-hidden.vbs" "%ROOT_DIR%"

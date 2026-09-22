@@ -69,6 +69,17 @@ The application operates with a **strict separation** between the historical leg
 
 ---
 
+### 4. Word Report Template APIs (`App\Services\ReportTemplateService`)
+- Templates live in `REPORT_TEMPLATE_PATH` (default `backend/storage/app/REPORT_MASTER`, not in git) and are linked to tests by file name (`T<test>_D<variant>_<stamp>.dot`, `U<user>_T<test>_<stamp>.dot`).
+- Converted to HTML by **MS Word on the server PC** and cached in `storage/app/private/report_template_cache`. Pre-convert all: `php artisan report-templates:warm`.
+- `GET /api/report-templates/status` — `word_installed`, `folder_exists`, `linked_tests`.
+- `GET /api/report-templates/lookup?codes=T1,T2` — template count per test code.
+- `GET /api/report-templates?test_code=` — templates for one test, default first.
+- `GET /api/report-templates/content?file=` — `{scope, css, html, page}`; `503 WORD_NOT_INSTALLED` when Word is missing.
+- `POST /api/sample-tracking/save-narrative` — saves the filled report to `tbl_web_booking_dtl.narrative_html`.
+
+---
+
 ## 🎨 Frontend Architecture & Layout Guidelines (`frontend/src/`)
 
 ### 1. Root Layout Management (`DashboardLayout`)

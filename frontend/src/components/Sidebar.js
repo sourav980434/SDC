@@ -51,6 +51,7 @@ const MENU_GROUPS = [
       { href: '/master/subdepartments', label: 'Sub Department', letter: 's' },
       { href: '/master/marketing-executives', label: 'Marketing Executive', letter: 'm' },
       { href: '/master/collectors', label: 'Collector Details', letter: 'l' },
+      { href: '/master/report-templates', label: 'Report Template', letter: 'r' },
     ],
   },
   {

@@ -1,5 +1,6 @@
 import { numberToWords, generateReportPin } from './numberToWords';
 import { getCachedLabSettings } from './labSettings';
+import { getAppOrigin } from './apiConfig';
 
 export function generateA5BillReceiptHTML(data) {
   const labConfig = getCachedLabSettings() || {};
@@ -60,7 +61,7 @@ export function generateA5BillReceiptHTML(data) {
 
   // QR Code URL for Live Invoice / Report Access
   const qrTrackingUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(
-    `http://192.168.0.11:3000/report-status?inv=${invoiceNo}`
+    `${getAppOrigin()}/report-status?inv=${invoiceNo}`
   )}`;
 
   return `

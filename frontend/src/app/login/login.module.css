@@ -279,3 +279,59 @@
   border-color: #006399;
   color: #ffffff;
 }
+
+/* Database connection indicator */
+.dbStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.dbDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.db_checking .dbDot {
+  animation: dbBlink 1s ease-in-out infinite;
+}
+
+.db_connected {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.db_connected .dbDot {
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
+}
+
+.db_db_error,
+.db_server_error,
+.db_server_down {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.db_db_error .dbDot,
+.db_server_error .dbDot,
+.db_server_down .dbDot {
+  animation: dbBlink 1s ease-in-out infinite;
+}
+
+@keyframes dbBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}

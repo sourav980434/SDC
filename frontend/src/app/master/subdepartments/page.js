@@ -7,6 +7,7 @@ import styles from '../master.module.css';
 
 import API_BASE from '@/lib/apiConfig';
 import { useAlert } from '@/components/AlertDialog';
+import SearchableSelect from '@/components/SearchableSelect';
 
 export default function SubDepartmentMaster() {
   const router = useRouter();
@@ -321,7 +322,7 @@ export default function SubDepartmentMaster() {
           {/* Department */}
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Department</label>
-            <select
+            <SearchableSelect
               className={styles.formSelect}
               value={deptCode}
               onChange={e => setDeptCode(e.target.value)}
@@ -332,7 +333,7 @@ export default function SubDepartmentMaster() {
               {departments.map(d => (
                 <option key={d.Code} value={d.Code}>{d.Descr}</option>
               ))}
-            </select>
+            </SearchableSelect>
           </div>
 
           {/* Sub Dept Name */}

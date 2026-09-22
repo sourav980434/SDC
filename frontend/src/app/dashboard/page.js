@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Calendar, 
   Clock, 
@@ -32,6 +33,7 @@ import styles from './dashboard.module.css';
 import API_BASE from '@/lib/apiConfig';
 
 export default function DailyDashboard() {
+  const router = useRouter();
   const [activeUser, setActiveUser] = useState(null);
   const [stats, setStats] = useState({
     today_bookings: 0,
@@ -95,7 +97,30 @@ export default function DailyDashboard() {
     { id: 'PID-99245', patient: 'Meena Sharma', test: 'Serum Potassium (K+)', value: '6.8 mmol/L', status: 'PANIC HIGH', time: '28m ago' }
   ];
 
-  const readyForDispatch = stats.ready_dispatches && stats.ready_dispatches.length > 0
+  // Sample rows are shown only when the database returned nothing - those are not clickable
+  const hasLiveBookings = !!(stats.ready_dispatches && stats.ready_dispatches.length > 0);
+
+  const openBooking = (b) => {
+    if (!hasLiveBookings || !b.regId) return;
+    const serial = String(b.regId).split('/').pop();
+    router.push(`/booking?loadSerial=${encodeURIComponent(serial)}&t=${Date.now()}`);
+  };
+
+  const printHardcopy = (e, b) => {
+    e.stopPropagation();
+    if (!hasLiveBookings || !b.bookingId) return;
+    router.push(`/lab/print-report?bookingId=${encodeURIComponent(b.bookingId)}`);
+  };
+
+  const rowProps = (b) => (hasLiveBookings ? {
+    className: styles.clickableRow,
+    onClick: () => openBooking(b),
+    onKeyDown: (e) => { if (e.key === 'Enter') openBooking(b); },
+    tabIndex: 0,
+    title: `Open booking ${b.regId}`,
+  } : {});
+
+  const readyForDispatch = hasLiveBookings
     ? stats.ready_dispatches
     : [
         { regId: 'BK/26-27/00081', name: 'Sourav Chowdhury', tests: 'SUGAR FASTING, SUGAR PP', status: 'Ready for Hardcopy' },
@@ -212,7 +237,7 @@ export default function DailyDashboard() {
                   </thead>
                   <tbody>
                     {readyForDispatch.map((b) => (
-                      <tr key={b.regId}>
+                      <tr key={b.regId} {...rowProps(b)}>
                         <td className={styles.td}><span className={styles.regId}>{b.regId}</span></td>
                         <td className={styles.td}><span className={styles.patientName}>{b.name}</span></td>
                         <td className={styles.td}><span className={styles.testType} title={b.tests}>{b.tests}</span></td>
@@ -353,12 +378,12 @@ export default function DailyDashboard() {
                   </thead>
                   <tbody>
                     {readyForDispatch.map((r) => (
-                      <tr key={r.regId}>
+                      <tr key={r.regId} {...rowProps(r)}>
                         <td className={styles.td}><span className={styles.regId}>{r.regId}</span></td>
                         <td className={styles.td}><span className={styles.patientName}>{r.name}</span></td>
                         <td className={styles.td}><span className={styles.testType} title={r.tests}>{r.tests}</span></td>
                         <td className={styles.td} style={{ textAlign: 'right' }}>
-                          <button className={styles.actionsLink} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <button className={styles.actionsLink} onClick={(e) => printHardcopy(e, r)} onKeyDown={(e) => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                             <Printer size={14} /> Print Hardcopy
                           </button>
                         </td>

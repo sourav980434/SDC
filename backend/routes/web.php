@@ -70,6 +70,7 @@ Route::get('/api/dashboard/stats', function () {
                     ->implode(', ');
 
                 return [
+                    'bookingId' => $h->id,
                     'regId' => $h->booking_no,
                     'name' => trim(($h->patient_prefix ?? '') . ' ' . ($h->patient_name ?? '')),
                     'tests' => $tests ?: 'Diagnostic Investigation',
@@ -2241,6 +2242,7 @@ Route::get('/api/sample-tracking/queue', function (Request $request) {
             'sampleCollectedAt' => !empty($item->sample_collected_at) ? (new DateTime($item->sample_collected_at))->format('d-M h:i A') : null,
             'testStatus' => $item->test_status ?? 'PENDING',
             'resultFlag' => $item->result_flag ?? 'NORMAL',
+            'hasNarrative' => !empty($item->narrative_html ?? null),
             'bookingDate' => !empty($item->booking_date) ? (new DateTime($item->booking_date))->format('d-M-Y') : ''
         ];
     });
@@ -2362,6 +2364,252 @@ Route::post('/api/sample-tracking/save-result', function (Request $request) {
     ]);
 
     return response()->json(['message' => 'Result saved successfully with flag: ' . $flag]);
+});
+
+// ---------- Word Report Templates (REPORT_MASTER folder) ----------
+// See App\Services\ReportTemplateService. Templates stay in the folder; only the filled report is stored.
+
+if (!function_exists('ensureNarrativeColumns')) {
+    function ensureNarrativeColumns() {
+        Cache::rememberForever('dtl_narrative_columns_ready', function () {
+            \Illuminate\Support\Facades\Schema::table('tbl_web_booking_dtl', function ($table) {
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tbl_web_booking_dtl', 'narrative_html')) $table->longText('narrative_html')->nullable();
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tbl_web_booking_dtl', 'report_template_file')) $table->string('report_template_file', 255)->nullable();
+            });
+            return true;
+        });
+    }
+}
+
+// Word availability + folder status (the editor alerts the user when Word is missing on the server PC)
+Route::get('/api/report-templates/status', function () {
+    $dir = \App\Services\ReportTemplateService::dir();
+    return response()->json([
+        'word_installed' => \App\Services\ReportTemplateService::wordInstalled(),
+        'folder_exists' => is_dir($dir),
+        'linked_tests' => count(\App\Services\ReportTemplateService::index()),
+    ]);
+});
+
+// Which of these test codes have templates: ?codes=T0000006,T0000010 -> { "T0000006": 2 }
+Route::get('/api/report-templates/lookup', function (Request $request) {
+    $index = \App\Services\ReportTemplateService::index();
+    $result = [];
+    foreach (array_filter(array_map('trim', explode(',', strtoupper($request->query('codes', ''))))) as $code) {
+        if (!empty($index[$code])) {
+            $result[$code] = count($index[$code]);
+        }
+    }
+    return response()->json($result);
+});
+
+// Templates available for one test (default first)
+Route::get('/api/report-templates', function (Request $request) {
+    $testCode = trim($request->query('test_code', ''));
+    if ($testCode === '') {
+        return response()->json(['error' => 'test_code is required.'], 400);
+    }
+    return response()->json(['templates' => \App\Services\ReportTemplateService::withNames(\App\Services\ReportTemplateService::forTest($testCode))]);
+});
+
+// Template converted to HTML (Word conversion on first open, cached afterwards)
+Route::get('/api/report-templates/content', function (Request $request) {
+    $file = trim($request->query('file', ''));
+    if (!\App\Services\ReportTemplateService::find($file)) {
+        return response()->json(['error' => 'Template file not found in REPORT_MASTER folder.'], 404);
+    }
+
+    set_time_limit(120);
+    try {
+        return response()->json(\App\Services\ReportTemplateService::content($file));
+    } catch (\RuntimeException $e) {
+        if ($e->getMessage() === 'WORD_NOT_INSTALLED') {
+            return response()->json([
+                'error' => 'Microsoft Word is not installed on the server PC.',
+                'code' => 'WORD_NOT_INSTALLED',
+            ], 503);
+        }
+        return response()->json(['error' => 'Could not open this template with Microsoft Word.', 'code' => 'CONVERSION_FAILED'], 500);
+    }
+});
+
+// ---- Report Template master (Master -> Report Template) ----
+
+// Template count for every linked test: { "T0000006": 5, ... }
+Route::get('/api/report-templates/overview', function () {
+    return response()->json(array_map('count', \App\Services\ReportTemplateService::index()));
+});
+
+// Reporting doctors for the upload form (variant code = MDoctor code of the doctor the template belongs to)
+Route::get('/api/report-templates/doctors', function () {
+    return response()->json(\App\Services\ReportTemplateService::reportingDoctors());
+});
+
+// Upload a Word file for a test; it is saved in REPORT_MASTER with the linking file name
+if (!function_exists('checkTemplateUpload')) {
+    /** Validates the uploaded Word template. Returns [UploadedFile, extension, null] or [null, null, error response]. */
+    function checkTemplateUpload(Request $request) {
+        $upload = $request->file('file');
+        if (!$upload || !$upload->isValid()) {
+            // Files above PHP's limit arrive empty - say so instead of "choose a file"
+            $tooBig = ($upload && in_array($upload->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true))
+                || (!$upload && (int) $request->server('CONTENT_LENGTH') > 0);
+            if ($tooBig) {
+                return [null, null, response()->json(['error' => 'File is larger than the server upload limit (upload_max_filesize = ' . ini_get('upload_max_filesize') . ', post_max_size = ' . ini_get('post_max_size') . ' in php.ini).'], 413)];
+            }
+            return [null, null, response()->json(['error' => 'Please choose a Word template file.'], 400)];
+        }
+        $ext = strtolower($upload->getClientOriginalExtension());
+        if (!in_array($ext, ['dot', 'doc', 'dotx', 'docx'], true)) {
+            return [null, null, response()->json(['error' => 'Only Word files (.dot, .doc, .dotx, .docx) can be uploaded.'], 400)];
+        }
+        if ($upload->getSize() > 10 * 1024 * 1024) {
+            return [null, null, response()->json(['error' => 'File is larger than 10 MB.'], 400)];
+        }
+        if (!is_dir(\App\Services\ReportTemplateService::dir())) {
+            return [null, null, response()->json(['error' => 'REPORT_MASTER folder not found on the server.'], 500)];
+        }
+        return [$upload, $ext, null];
+    }
+}
+
+Route::post('/api/report-templates/upload', function (Request $request) {
+    $service = \App\Services\ReportTemplateService::class;
+    $testCode = strtoupper(trim($request->input('test_code', '')));
+    $variant = strtoupper(trim($request->input('variant', 'D0000390')));
+
+    if (!preg_match('/^T\d{7}$/', $testCode)) {
+        return response()->json(['error' => 'Select a valid test.'], 400);
+    }
+    if (!preg_match('/^[DU]\d{7}$/', $variant)) {
+        return response()->json(['error' => 'Variant must be D + 7 digits (e.g. D0000390) or a user code U + 7 digits.'], 400);
+    }
+    [$upload, $ext, $uploadError] = checkTemplateUpload($request);
+    if ($uploadError) {
+        return $uploadError;
+    }
+    if (!DB::table('MTest')->where('Code', $testCode)->exists()) {
+        return response()->json(['error' => "Test $testCode not found in Test Master."], 404);
+    }
+
+    try {
+        $makeDefault = filter_var($request->input('make_default', true), FILTER_VALIDATE_BOOLEAN);
+        // "Newest file" is the default when none was chosen - pin the current one so an
+        // upload that should not be the default does not take over just by being newer
+        if (!$makeDefault && empty($service::defaults()[$testCode])) {
+            $current = $service::forTest($testCode)[0]['file'] ?? null;
+            if ($current) {
+                $service::setDefault($testCode, $current);
+            }
+        }
+
+        $file = $service::store($upload->getRealPath(), $ext, $testCode, $variant);
+        if ($makeDefault) {
+            $service::setDefault($testCode, $file);
+        }
+    } catch (\RuntimeException $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+
+    logAuditLog(null, getCurrentUserName($request), 'REPORT_TEMPLATE', 'UPLOAD', "Template $file uploaded for test $testCode");
+    return response()->json(['message' => 'Template uploaded.', 'file' => $file, 'templates' => $service::withNames($service::forTest($testCode))]);
+});
+
+// Replace an existing template with an edited Word file - same name, doctor and default;
+// the previous file is kept in REPORT_MASTER/_versions
+Route::post('/api/report-templates/replace', function (Request $request) {
+    $service = \App\Services\ReportTemplateService::class;
+    $tpl = $service::find(trim($request->input('template', '')));
+    if (!$tpl) {
+        return response()->json(['error' => 'Template not found.'], 404);
+    }
+
+    [$upload, $ext, $uploadError] = checkTemplateUpload($request);
+    if ($uploadError) {
+        return $uploadError;
+    }
+
+    try {
+        $file = $service::replace($tpl['file'], $upload->getRealPath(), $ext);
+    } catch (\RuntimeException $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+
+    logAuditLog(null, getCurrentUserName($request), 'REPORT_TEMPLATE', 'REPLACE', "Template {$tpl['file']} replaced for test {$tpl['test_code']}" . ($file !== $tpl['file'] ? " (now $file)" : ''));
+    return response()->json(['message' => 'Template updated.', 'file' => $file, 'templates' => $service::withNames($service::forTest($tpl['test_code']))]);
+});
+
+// Choose which template opens by default for its test
+Route::post('/api/report-templates/set-default', function (Request $request) {
+    $service = \App\Services\ReportTemplateService::class;
+    $tpl = $service::find(trim($request->input('file', '')));
+    if (!$tpl) {
+        return response()->json(['error' => 'Template not found.'], 404);
+    }
+    $service::setDefault($tpl['test_code'], $tpl['file']);
+    logAuditLog(null, getCurrentUserName($request), 'REPORT_TEMPLATE', 'SET_DEFAULT', "Default template for {$tpl['test_code']}: {$tpl['file']}");
+    return response()->json(['message' => 'Default template updated.', 'templates' => $service::withNames($service::forTest($tpl['test_code']))]);
+});
+
+// Unlink a template (file is moved to REPORT_MASTER/_deleted, not destroyed)
+Route::post('/api/report-templates/delete', function (Request $request) {
+    $service = \App\Services\ReportTemplateService::class;
+    $tpl = $service::find(trim($request->input('file', '')));
+    if (!$tpl) {
+        return response()->json(['error' => 'Template not found.'], 404);
+    }
+    try {
+        $service::remove($tpl['file']);
+    } catch (\RuntimeException $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+    logAuditLog(null, getCurrentUserName($request), 'REPORT_TEMPLATE', 'DELETE', "Template {$tpl['file']} removed from test {$tpl['test_code']}");
+    return response()->json(['message' => 'Template removed.', 'templates' => $service::withNames($service::forTest($tpl['test_code']))]);
+});
+
+// Download the original Word file (to edit it in Word and upload again)
+Route::get('/api/report-templates/download', function (Request $request) {
+    $service = \App\Services\ReportTemplateService::class;
+    $tpl = $service::find(trim($request->query('file', '')));
+    if (!$tpl) {
+        return response()->json(['error' => 'Template not found.'], 404);
+    }
+    return response()->download($service::path($tpl['file']), $tpl['file']);
+});
+
+// Save the filled template report for one test line
+Route::post('/api/sample-tracking/save-narrative', function (Request $request) {
+    $dtlId = $request->input('id');
+    $html = (string) $request->input('html', '');
+
+    if (!$dtlId) {
+        return response()->json(['error' => 'Detail ID is required.'], 400);
+    }
+    if (trim(strip_tags($html)) === '') {
+        return response()->json(['error' => 'Report is empty.'], 400);
+    }
+
+    ensureNarrativeColumns();
+
+    $html = preg_replace('/<script\b.*?<\/script>/is', '', $html);
+    $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
+
+    $updated = DB::table('tbl_web_booking_dtl')->where('id', $dtlId)->update([
+        'narrative_html' => $html,
+        'report_template_file' => substr(trim((string) $request->input('template_file', '')), 0, 255) ?: null,
+        'test_status' => 'RESULT_ENTERED',
+        'result_flag' => 'NORMAL',
+        'result_entered_at' => now(),
+        'result_entered_by' => getCurrentUserName($request ?? null),
+    ]);
+
+    if (!$updated) {
+        return response()->json(['error' => 'Test line not found.'], 404);
+    }
+
+    logAuditLog(null, getCurrentUserName($request), 'RESULT_ENTRY', 'SAVE_REPORT', "Template report saved for booking detail #$dtlId");
+
+    return response()->json(['message' => 'Report saved successfully.']);
 });
 
 Route::post('/api/sample-tracking/verify', function (Request $request) {
@@ -2760,7 +3008,8 @@ Route::get('/api/lab/patient-full-report/{bookingId}', function ($bookingId) {
             'dept_name' => trim($item->dept_name ?? 'UNKNOWN'),
             'test_status' => trim($item->test_status ?? 'PENDING'),
             'result_json' => $resultJson,
-            'narrative_html' => $item->narrative_html,
+            'narrative_html' => $item->narrative_html ?? null,
+            'report_template_file' => $item->report_template_file ?? null,
             'result_entered_at' => $item->result_entered_at,
             'verified_at' => $item->verified_at
         ];

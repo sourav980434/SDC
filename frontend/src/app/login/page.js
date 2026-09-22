@@ -20,12 +20,37 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [isCapsLock, setIsCapsLock] = useState(false);
   const [labConfig, setLabConfig] = useState(DEFAULT_LAB_CONFIG);
+  // 'checking' | 'connected' | 'db_error' | 'server_error' | 'server_down'
+  const [dbStatus, setDbStatus] = useState('checking');
 
   useEffect(() => {
     fetchLabSettings().then(cfg => {
       if (cfg) setLabConfig(cfg);
     });
   }, []);
+
+  // Backend + SQL Server connection indicator, re-checked every 30 s
+  const checkConnection = () => {
+    setDbStatus(prev => (prev === 'connected' ? prev : 'checking'));
+    fetch(`${API_BASE}/api`, { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error('server_error'))))
+      .then(data => setDbStatus(data.database === 'CONNECTED' ? 'connected' : 'db_error'))
+      .catch(err => setDbStatus(err.message === 'server_error' ? 'server_error' : 'server_down'));
+  };
+
+  useEffect(() => {
+    checkConnection();
+    const timer = setInterval(checkConnection, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const DB_STATUS_TEXT = {
+    checking: 'Checking database connection...',
+    connected: 'Database Connected',
+    db_error: 'Database Not Connected',
+    server_error: 'Backend Error - check backend/.env',
+    server_down: 'Backend Server Not Running',
+  };
 
   const handleKeyDownPassword = (e) => {
     if (e.getModifierState) {
@@ -92,6 +117,15 @@ export default function LoginPage() {
           <p className={styles.subtitle}>
             Clinical LIMS & Web Authorization Portal
           </p>
+          <button
+            type="button"
+            className={`${styles.dbStatus} ${styles['db_' + dbStatus]}`}
+            onClick={checkConnection}
+            title={dbStatus === 'connected' ? 'SQL Server database is reachable' : 'Click to check again'}
+          >
+            <span className={styles.dbDot} />
+            {DB_STATUS_TEXT[dbStatus]}
+          </button>
         </div>
 
         {errorMsg && (

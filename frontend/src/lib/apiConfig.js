@@ -14,3 +14,13 @@ if (typeof window !== 'undefined' && window.location.hostname) {
 }
 
 export default API_BASE;
+
+/**
+ * Address of this web app as the user opened it (e.g. http://192.168.1.14:3000).
+ * Used in printed QR codes so they follow whichever PC / LAN IP runs the project.
+ */
+export function getAppOrigin() {
+  if (typeof window !== 'undefined' && window.location.origin) return window.location.origin;
+  return 'http://localhost:3000';
+}
+

@@ -587,3 +587,19 @@
   color: rgba(255, 255, 255, 0.15);
   transform: scale(1.8);
 }
+
+/* Booking rows that open the booking page */
+.clickableRow {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.clickableRow:hover,
+.clickableRow:focus-visible {
+  background-color: var(--secondary-container);
+  outline: none;
+}
+
+.clickableRow:hover .regId {
+  text-decoration: underline;
+}

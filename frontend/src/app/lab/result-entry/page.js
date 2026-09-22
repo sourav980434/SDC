@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, FlaskConical, Check, AlertTriangle, FileCheck, CheckCircle, Save } from 'lucide-react';
+import { Search, FlaskConical, Check, AlertTriangle, FileCheck, CheckCircle, Save, FileText } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import styles from '../sample-tracking/sample.module.css';
 
 import API_BASE from '@/lib/apiConfig';
@@ -11,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function LabResultEntryPage() {
   const perms = useActionPermission('result_entry');
+  const router = useRouter();
   const { user: activeUser } = useAuth();
   const isAdmin = activeUser?.role_code === 'ADMIN';
 
@@ -52,6 +54,9 @@ export default function LabResultEntryPage() {
 
   // Store entered parameter values per item: { itemId: { [param_code]: valueStr } }
   const [paramValues, setParamValues] = useState({});
+
+  // Word report templates available per test code (REPORT_MASTER folder): { T0000006: 2 }
+  const [templateCounts, setTemplateCounts] = useState({});
 
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -146,6 +151,15 @@ export default function LabResultEntryPage() {
     const items = queue.filter(q => q.bookingNo === item.bookingNo);
     setBookingItems(items);
 
+    setTemplateCounts({});
+    const codes = [...new Set(items.map(it => (it.testCode || '').trim()).filter(Boolean))];
+    if (codes.length > 0) {
+      fetch(`${API_BASE}/api/report-templates/lookup?codes=${encodeURIComponent(codes.join(','))}`)
+        .then(res => res.json())
+        .then(data => setTemplateCounts(data || {}))
+        .catch(() => setTemplateCounts({}));
+    }
+
     const templates = {};
     const initialVals = {};
     let fetchedCount = 0;
@@ -232,12 +246,20 @@ export default function LabResultEntryPage() {
     return { label: 'NORMAL', bg: '#f0fdf4', color: '#15803d' };
   };
 
+  const hasTemplate = (it) => !!templateCounts[(it.testCode || '').trim()];
+
+  const openReportEditor = (it) => {
+    router.push(`/lab/report-editor?id=${encodeURIComponent(it.id)}&booking=${encodeURIComponent(it.booking_id)}`);
+  };
+
   const handleSaveAllResults = () => {
-    if (bookingItems.length === 0) return;
+    // Template tests are saved from the report editor, not from this sheet
+    const sheetItems = bookingItems.filter(it => !hasTemplate(it));
+    if (sheetItems.length === 0) return;
     setSaving(true);
 
     let completed = 0;
-    bookingItems.forEach(it => {
+    sheetItems.forEach(it => {
       const pList = itemParameters[it.id] || [];
       const vals = paramValues[it.id] || {};
 
@@ -266,7 +288,7 @@ export default function LabResultEntryPage() {
         .then(res => res.json())
         .then(() => {
           completed++;
-          if (completed === bookingItems.length) {
+          if (completed === sheetItems.length) {
             setSaving(false);
             setMessage('All lab test results saved successfully!');
             setTimeout(() => setMessage(''), 4000);
@@ -275,7 +297,7 @@ export default function LabResultEntryPage() {
         })
         .catch(err => {
           completed++;
-          if (completed === bookingItems.length) setSaving(false);
+          if (completed === sheetItems.length) setSaving(false);
         });
     });
   };
@@ -431,6 +453,25 @@ export default function LabResultEntryPage() {
                       </span>
                     </div>
 
+                    {hasTemplate(it) ? (
+                      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                        <div style={{ fontSize: '13px' }}>
+                          <div style={{ fontWeight: '700', color: 'var(--primary)' }}>
+                            Word report template ({templateCounts[(it.testCode || '').trim()]} format{templateCounts[(it.testCode || '').trim()] > 1 ? 's' : ''})
+                          </div>
+                          <div style={{ marginTop: '4px', fontWeight: '700', color: it.hasNarrative ? '#15803d' : '#b45309' }}>
+                            {it.hasNarrative ? 'Report saved - open to edit or print' : 'Report pending'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openReportEditor(it)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px', backgroundColor: '#0369a1', color: '#ffffff', border: 'none', borderRadius: 'var(--radius-lg)', fontWeight: '800', cursor: 'pointer' }}
+                        >
+                          <FileText size={16} /> {it.hasNarrative ? 'Open Report' : 'Write Report'}
+                        </button>
+                      </div>
+                    ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                       <thead>
                         <tr style={{ backgroundColor: 'var(--surface-container-low)', textAlign: 'left' }}>
@@ -488,6 +529,7 @@ export default function LabResultEntryPage() {
                         })}
                       </tbody>
                     </table>
+                    )}
                   </div>
                 );
               })}

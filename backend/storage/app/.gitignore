@@ -2,3 +2,11 @@
 !private/
 !public/
 !.gitignore
+
+# Word report templates are shared through git (Report Template master / report editor)
+!REPORT_MASTER/
+!REPORT_MASTER/**
+# ...but local backups and per-PC default choices stay on this PC
+REPORT_MASTER/_versions/
+REPORT_MASTER/_deleted/
+REPORT_MASTER/_defaults.json

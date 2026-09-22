@@ -1,6 +1,7 @@
 
 
 import { getCachedLabSettings } from './labSettings';
+import { getAppOrigin } from './apiConfig';
 
 function getSpecimenGuidance(testName = '') {
   const name = testName.toUpperCase();
@@ -78,7 +79,7 @@ export function generateA5DepartmentSlipsHTML(data) {
 
   // QR Code URL for Live Department Audit
   const qrTrackingUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(
-    `http://192.168.0.11:3000/report-status?bk=${bookingNo}`
+    `${getAppOrigin()}/report-status?bk=${bookingNo}`
   )}`;
 
   const slipPagesHTML = deptKeys
