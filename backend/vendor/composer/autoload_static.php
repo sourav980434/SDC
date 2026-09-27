@@ -568,10 +568,16 @@ class ComposerStaticInit36793882908b6cbdd344b5a4840231db
 
     public static $classMap = array (
         'App\\Http\\Controllers\\Controller' => __DIR__ . '/../..' . '/app/Http/Controllers/Controller.php',
+        'App\\Http\\Middleware\\AuditLogMiddleware' => __DIR__ . '/../..' . '/app/Http/Middleware/AuditLogMiddleware.php',
         'App\\Http\\Middleware\\CorsMiddleware' => __DIR__ . '/../..' . '/app/Http/Middleware/CorsMiddleware.php',
         'App\\Models\\User' => __DIR__ . '/../..' . '/app/Models/User.php',
         'App\\Providers\\AppServiceProvider' => __DIR__ . '/../..' . '/app/Providers/AppServiceProvider.php',
+        'App\\Services\\LetterheadService' => __DIR__ . '/../..' . '/app/Services/LetterheadService.php',
+        'App\\Services\\NotificationService' => __DIR__ . '/../..' . '/app/Services/NotificationService.php',
+        'App\\Services\\ReportPdfService' => __DIR__ . '/../..' . '/app/Services/ReportPdfService.php',
         'App\\Services\\ReportTemplateService' => __DIR__ . '/../..' . '/app/Services/ReportTemplateService.php',
+        'App\\Services\\TemplateImportService' => __DIR__ . '/../..' . '/app/Services/TemplateImportService.php',
+        'App\\Services\\TestFormatService' => __DIR__ . '/../..' . '/app/Services/TestFormatService.php',
         'Attribute' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/Attribute.php',
         'Brick\\Math\\BigDecimal' => __DIR__ . '/..' . '/brick/math/src/BigDecimal.php',
         'Brick\\Math\\BigInteger' => __DIR__ . '/..' . '/brick/math/src/BigInteger.php',

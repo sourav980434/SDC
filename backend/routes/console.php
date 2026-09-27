@@ -76,3 +76,32 @@ Artisan::command('report-templates:warm {--batch=40}', function () {
     $this->info('Converted: ' . (count($pending) - count($failed)) . ', failed: ' . count($failed));
     return 0;
 })->purpose('Convert REPORT_MASTER Word templates to cached HTML');
+
+// Imports the Word report templates (REPORT_MASTER) into the test formats in the database:
+// parameters, units, reference ranges and narrative text. Formats already edited in the Test
+// Master are left alone unless --force.   php artisan test-formats:import [T0000118 ...] [--dry]
+Artisan::command('test-formats:import {tests?* : Test codes; all tests with a template when empty} {--dry : Only show what would be imported} {--force : Also overwrite formats edited by the lab staff}', function () {
+    $tests = $this->argument('tests');
+    $dry = (bool) $this->option('dry');
+
+    $this->info(($dry ? '[DRY RUN] ' : '') . 'Importing report formats from ' . \App\Services\ReportTemplateService::dir());
+    $bar = $tests && count($tests) <= 20 ? null : $this->output->createProgressBar(count($tests ?: \App\Services\ReportTemplateService::index()));
+
+    $summary = \App\Services\TemplateImportService::import($tests, $dry, (bool) $this->option('force'), 'IMPORT', function ($code, $row) use ($bar) {
+        if ($bar) {
+            $bar->advance();
+            return;
+        }
+        $this->line(sprintf('  %-9s %-8s %-9s %3s  %s', $code, $row['status'], $row['type'] ?? '', $row['params'] ?? '', $row['error'] ?? str_replace("\n", ' | ', $row['notes'] ?? '')));
+    });
+    if ($bar) {
+        $bar->finish();
+        $this->newLine();
+    }
+
+    $counts = array_count_values(array_map(fn ($r) => $r['status'] . (isset($r['type']) ? ' ' . $r['type'] : ''), $summary));
+    ksort($counts);
+    $this->table(['Result', 'Tests'], array_map(fn ($k, $v) => [$k, $v], array_keys($counts), $counts));
+    $this->info($dry ? 'Dry run - nothing was saved.' : 'Saved. Formats marked CHECK should be looked at in the Test Master.');
+    return 0;
+})->purpose('Import Word report templates into database test formats');

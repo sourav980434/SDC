@@ -178,7 +178,7 @@ function getCurrentFinYear() {
 }
 
 // Helper function to get current user code from request headers (set by frontend)
-function getCurrentUserCode(\Illuminate\Http\Request $request = null) {
+function getCurrentUserCode(?\Illuminate\Http\Request $request = null) {
     if ($request) {
         return $request->header('X-User-Code', 'U0000001');
     }
@@ -186,7 +186,7 @@ function getCurrentUserCode(\Illuminate\Http\Request $request = null) {
 }
 
 // Helper function to get current user name from request headers (set by frontend)
-function getCurrentUserName(\Illuminate\Http\Request $request = null) {
+function getCurrentUserName(?\Illuminate\Http\Request $request = null) {
     if ($request) {
         return $request->header('X-User-Name', 'System');
     }
@@ -199,7 +199,7 @@ function getCurrentUserName(\Illuminate\Http\Request $request = null) {
  * header (internal scripts). Cached for a minute so it costs one query per user, not per row.
  */
 if (!function_exists('userDeptCodes')) {
-    function userDeptCodes(\Illuminate\Http\Request $request = null) {
+    function userDeptCodes(?\Illuminate\Http\Request $request = null) {
         $userCode = $request ? trim((string) $request->header('X-User-Code')) : '';
         if ($userCode === '') {
             return null;

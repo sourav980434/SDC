@@ -17,8 +17,8 @@ if defined PHP_BIN if exist "%PHP_BIN%\php.exe" set "PATH=%PHP_BIN%;%PATH%"
 where php >nul 2>&1
 if %errorlevel% neq 0 goto :NO_PHP
 
-:: Verify PHP version (backend vendor packages require PHP 8.2+)
-php -r "exit(PHP_VERSION_ID >= 80200 ? 0 : 1);" >nul 2>&1
+:: Verify PHP version (this project runs on PHP 8.4; backend vendor packages require 8.4.1+)
+php -r "exit(PHP_VERSION_ID >= 80401 ? 0 : 1);" >nul 2>&1
 if %errorlevel% neq 0 goto :OLD_PHP
 
 :: Verify Node.js availability
@@ -67,10 +67,10 @@ pause
 exit /b 1
 
 :OLD_PHP
-echo [ERROR] PHP 8.2 or newer is required. Found:
+echo [ERROR] PHP 8.4 (8.4.1 or newer) is required. Found:
 php -v
 echo.
-echo Install PHP 8.2 or newer to D:\php84, C:\php84, XAMPP, or set PHP_BIN to its folder.
+echo Install PHP 8.4 to D:\php84 or C:\php84, or set PHP_BIN to its folder.
 pause
 exit /b 1
 
