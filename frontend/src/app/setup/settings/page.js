@@ -221,6 +221,20 @@ export default function SettingsPage() {
               onChange={e => handleChange('lab_website', e.target.value)}
             />
           </div>
+
+          <div className={styles.formGroup}>
+            <label>Public Report URL (for the QR code on reports)</label>
+            <input
+              type="text"
+              className={styles.input}
+              placeholder="e.g. https://reports.yourlab.in - empty = this app's own address"
+              value={form.public_report_url || ''}
+              onChange={e => handleChange('public_report_url', e.target.value.trim())}
+            />
+            <small style={{ color: 'var(--outline)', fontSize: '11.5px' }}>
+              Address where patients open this app from the internet once it is live. The QR on a report opens its approved reports there for download.
+            </small>
+          </div>
         </div>
 
         {/* Card 2: Report Footer & Signatories */}

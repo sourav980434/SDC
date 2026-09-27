@@ -104,6 +104,8 @@ export function AuthProvider({ children }) {
     if (!isLoaded) return;
 
     const isPublicRoute = pathname === '/login';
+    // Patients' report download page (QR code on the report) never needs a login
+    if (pathname && pathname.startsWith('/r/')) return;
 
     if (!user && !isPublicRoute) {
       // Unauthenticated user trying to access protected route -> redirect to /login

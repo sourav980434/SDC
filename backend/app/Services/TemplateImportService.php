@@ -651,6 +651,22 @@ class TemplateImportService
         return trim($html);
     }
 
+    /** Same cleaning for HTML typed in the Test Master editor: simple formatting only, no scripts or styles. */
+    public static function sanitizeHtml(?string $html): ?string
+    {
+        if ($html === null || trim($html) === '') {
+            return null;
+        }
+        $doc = new DOMDocument();
+        @$doc->loadHTML('<?xml encoding="utf-8"?><div id="tpl-root">' . $html . '</div>');
+        $root = $doc->getElementById('tpl-root');
+        if (!$root) {
+            return null;
+        }
+        $clean = trim(self::inner($root));
+        return strip_tags($clean) === '' && !str_contains($clean, '<table') ? null : $clean;
+    }
+
     private static function clean(DOMNode $node): string
     {
         if ($node->nodeType === XML_TEXT_NODE) {
@@ -666,6 +682,9 @@ class TemplateImportService
             return '';
         }
         $inner = self::inner($node);
+        if ($tag === 'div' && !preg_match('~<(p|div|table|ul|ol)\b~i', $inner)) {
+            $tag = 'p';   // a browser editor writes each line as <div>
+        }
         if (!in_array($tag, self::KEEP_TAGS, true)) {
             return $inner;
         }

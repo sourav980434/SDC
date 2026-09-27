@@ -20,6 +20,7 @@ export const SYSTEM_MODULES = [
   { key: 'report_approval', name: 'Report Approval (Doctor Copy Match)' },
   { key: 'masters', name: 'Master Setup' },
   { key: 'report_templates', name: 'Report Template Master' },
+  { key: 'test_formats', name: 'Test Format Master (Parameters & Ranges)' },
   { key: 'reports', name: 'Reports & Analytics' },
   { key: 'setup', name: 'User & Permission Setup' }
 ];

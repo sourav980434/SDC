@@ -14,6 +14,7 @@ export const DEFAULT_LAB_CONFIG = {
   login_bg_image_url: '/santoshpur_building.jpg',
   login_theme_preset: 'building_image',
   login_logo_animation: 'pulse',
+  public_report_url: '',         // live address for report QR codes (empty = the address the app is opened on)
   letterhead_image: '',          // file name of the uploaded A4 letterhead (empty = plain header)
   letterhead_top_mm: 45,         // space left for the printed header
   letterhead_bottom_mm: 25,      // space left for the printed footer

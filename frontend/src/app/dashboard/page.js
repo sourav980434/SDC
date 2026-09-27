@@ -109,7 +109,7 @@ export default function DailyDashboard() {
   const printHardcopy = (e, b) => {
     e.stopPropagation();
     if (!hasLiveBookings || !b.bookingId) return;
-    router.push(`/lab/print-report?bookingId=${encodeURIComponent(b.bookingId)}`);
+    window.open(`/print/report?booking=${encodeURIComponent(b.bookingId)}`, '_blank');
   };
 
   const rowProps = (b) => (hasLiveBookings ? {
@@ -466,7 +466,7 @@ export default function DailyDashboard() {
           {/* Lab Tech Actions */}
           <div style={{ display: 'flex', gap: '12px' }}>
             <Link
-              href="/lab/result-entry"
+              href="/lab/report-entry"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -484,7 +484,7 @@ export default function DailyDashboard() {
               <FileText size={20} /> Enter Lab Test Results
             </Link>
             <Link
-              href="/lab/verification"
+              href="/lab/approval"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

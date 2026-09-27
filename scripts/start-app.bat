@@ -43,8 +43,16 @@ if not defined LOCAL_IP (
 )
 if not defined LOCAL_IP set "LOCAL_IP=127.0.0.1"
 
+:: Start only what is not running yet - running start-app twice must not start a second
+:: backend / frontend (two Next.js dev servers on one .next folder corrupt its build cache)
+set "RUN_BACKEND=1"
+set "RUN_FRONTEND=1"
+netstat -ano | findstr /r /c:":8000 .*LISTENING" >nul && set "RUN_BACKEND=0"
+netstat -ano | findstr /r /c:":3000 .*LISTENING" >nul && set "RUN_FRONTEND=0"
+if "%RUN_BACKEND%%RUN_FRONTEND%"=="00" echo [INFO] App is already running - opening it in the browser.
+
 :: Launch Backend & Frontend in 100% hidden background (zero CMD windows)
-wscript.exe "%~dp0start-hidden.vbs" "%ROOT_DIR%"
+wscript.exe "%~dp0start-hidden.vbs" "%ROOT_DIR%" %RUN_BACKEND% %RUN_FRONTEND%
 
 :: Open browser on IP address and exit launcher window immediately
 ping 127.0.0.1 -n 3 >nul

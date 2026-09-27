@@ -46,7 +46,9 @@ const MENU_GROUPS = [
       { href: '/master/subdepartments', label: 'Sub Department', letter: 's' , module: 'masters' },
       { href: '/master/marketing-executives', label: 'Marketing Executive', letter: 'm' , module: 'masters' },
       { href: '/master/collectors', label: 'Collector Details', letter: 'l' , module: 'masters' },
-      { href: '/master/report-templates', label: 'Report Template', letter: 'r', module: 'report_templates' },
+      // Word template reports are replaced by Test Format (database formats) - kept for reference
+      // { href: '/master/report-templates', label: 'Report Template', letter: 'r', module: 'report_templates' },
+      { href: '/master/test-formats', label: 'Test Format', letter: 'f', module: 'test_formats' },
     ],
   },
   {
@@ -96,9 +98,13 @@ const MENU_GROUPS = [
     isActivePath: (p) => p.startsWith('/pending-tests') || p.startsWith('/lab/'),
     items: [
       { href: '/lab/sample-tracking', label: 'Sample Tracking', letter: 's', module: 'sample_tracking' },
-      { href: '/lab/result-entry', label: 'Lab Result Entry', letter: 'r', module: 'result_entry' },
-      { href: '/lab/report-approval', label: 'Report Approval', letter: 'a', module: 'report_approval' },
-      { href: '/lab/verification', label: 'Pathology Verification', letter: 'v', module: 'verification' },
+      // Reports from the Test Format Master: enter results -> approve against the doctor copy -> print
+      { href: '/lab/report-entry', label: 'Report Entry', letter: 'r', module: 'result_entry' },
+      { href: '/lab/approval', label: 'Report Approval', letter: 'a', module: 'report_approval' },
+      // Old Word-template flow - replaced by Report Entry / Report Approval above, pages kept for reference
+      // { href: '/lab/result-entry', label: 'Lab Result Entry', letter: 'r', module: 'result_entry' },
+      // { href: '/lab/report-approval', label: 'Report Approval', letter: 'a', module: 'report_approval' },
+      // { href: '/lab/verification', label: 'Pathology Verification', letter: 'v', module: 'verification' },
       { href: '/pending-tests', label: 'Pending Test Register', letter: 't', module: 'pending_tests', globalShortcut: 'GOTO_PENDING' },
     ],
   },

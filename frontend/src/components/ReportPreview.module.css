@@ -1,0 +1,282 @@
+/* A4 report page - always printed on white, so fixed colours (not theme tokens) */
+.page {
+  position: relative;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  background: #ffffff;
+  color: #111827;
+  font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 16px rgba(15, 23, 42, 0.18);
+  background-size: 210mm 297mm;
+  background-repeat: no-repeat;
+  background-position: top center;
+}
+
+.watermark {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-28deg);
+  font-size: 110px;
+  font-weight: 900;
+  letter-spacing: 12px;
+  color: rgba(15, 23, 42, 0.05);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* header band (when no letterhead image is uploaded) */
+.header {
+  background: #0b3a6e;
+  color: #ffffff;
+  padding: 16px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.labName {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.labSub {
+  font-size: 11px;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+.contact {
+  font-size: 11px;
+  text-align: right;
+  line-height: 1.7;
+  opacity: 0.95;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.body {
+  padding: 14px 28px 0 28px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* patient block */
+.patient {
+  display: grid;
+  grid-template-columns: 1.25fr 1.15fr auto;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1.5px solid #0b3a6e;
+}
+
+.patientName {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 82px auto;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.kv span:nth-child(odd) {
+  color: #374151;
+}
+
+.barcode {
+  display: block;
+  height: 30px;
+  margin-bottom: 2px;
+}
+
+.qr {
+  text-align: center;
+  font-size: 9px;
+  color: #374151;
+}
+
+.qr img {
+  width: 88px;
+  height: 88px;
+  display: block;
+  margin-top: 2px;
+}
+
+/* department / test title */
+.dept {
+  text-align: center;
+  font-weight: 800;
+  font-size: 13.5px;
+  margin-top: 10px;
+  letter-spacing: 0.02em;
+}
+
+.testTitle {
+  text-align: center;
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.specimen {
+  font-size: 11px;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+/* results */
+.results {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.results th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 4px 6px;
+  border-top: 1.5px solid #111827;
+  border-bottom: 1.5px solid #111827;
+}
+
+.results td {
+  padding: 4px 6px;
+  vertical-align: top;
+}
+
+.colName { width: 44%; }
+.colFlag { width: 4%; text-align: center; font-weight: 800; }
+.colValue { width: 14%; }
+.colUnit { width: 14%; }
+.colRef { width: 24%; white-space: pre-line; }
+
+.method {
+  display: block;
+  font-size: 10px;
+  font-style: italic;
+  color: #4b5563;
+}
+
+.heading td {
+  font-weight: 800;
+  padding-top: 7px;
+  text-transform: uppercase;
+}
+
+.abnormal td {
+  font-weight: 800;
+}
+
+.panic td {
+  font-weight: 800;
+  color: #b91c1c;
+}
+
+.endLine {
+  border-top: 1px solid #9ca3af;
+  margin-top: 4px;
+}
+
+.notes {
+  margin-top: 12px;
+  font-size: 11.5px;
+  padding: 10px 12px;
+  background: #f3f6fa;
+  border-radius: 4px;
+}
+
+.notes p {
+  margin: 0 0 3px 0;
+}
+
+.notes table,
+.narrative table {
+  border-collapse: collapse;
+  margin: 4px 0;
+}
+
+.notes td,
+.notes th,
+.narrative td,
+.narrative th {
+  border: 1px dotted #9ca3af;
+  padding: 2px 6px;
+  vertical-align: top;
+}
+
+.narrative {
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.narrative p {
+  margin: 0 0 4px 0;
+}
+
+.blank {
+  background: #fef08a;
+  padding: 0 2px;
+}
+
+.endOfReport {
+  text-align: center;
+  font-size: 10.5px;
+  color: #6b7280;
+  margin: 14px 0 0 0;
+  letter-spacing: 0.08em;
+}
+
+/* signatures + footer */
+.signs {
+  margin-top: auto;
+  padding-top: 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.sign {
+  font-size: 11px;
+  min-width: 170px;
+}
+
+.sign strong {
+  display: block;
+  font-size: 11.5px;
+  border-top: 1px solid #9ca3af;
+  padding-top: 4px;
+}
+
+.signRight {
+  text-align: right;
+}
+
+.pageNo {
+  font-size: 10.5px;
+  color: #374151;
+  align-self: flex-end;
+}
+
+.footer {
+  margin-top: 10px;
+  border-top: 3px solid #0b3a6e;
+  padding: 6px 28px 10px 28px;
+  text-align: center;
+  font-size: 10px;
+  color: #374151;
+}

@@ -123,11 +123,180 @@ class TestFormatService
             ? DB::table('tbl_web_test_param_ranges')->whereIn('parameter_id', array_column($params, 'id'))->get()->groupBy('parameter_id')
             : collect();
 
+        // SQL Server hands bits, ids and decimals back as strings
+        $num = fn ($v) => $v === null ? null : (float) $v;
         foreach ($params as $i => $p) {
-            $params[$i]['ranges'] = ($ranges[$p['id']] ?? collect())->map(fn ($r) => (array) $r)->values()->all();
+            $params[$i]['id'] = (int) $p['id'];
+            $params[$i]['sort_order'] = (int) $p['sort_order'];
+            $params[$i]['indent'] = (int) $p['indent'];
+            $params[$i]['decimals'] = $p['decimals'] === null ? null : (int) $p['decimals'];
+            $params[$i]['is_bold'] = (bool) $p['is_bold'];
+            $params[$i]['is_active'] = (bool) $p['is_active'];
+            $params[$i]['ranges'] = ($ranges[$p['id']] ?? collect())->map(function ($r) use ($num) {
+                $r = (array) $r;
+                foreach (['age_from', 'age_to', 'low', 'high', 'panic_low', 'panic_high'] as $k) {
+                    $r[$k] = $num($r[$k]);
+                }
+                $r['id'] = (int) $r['id'];
+                $r['parameter_id'] = (int) $r['parameter_id'];
+                return $r;
+            })->values()->all();
         }
 
-        return ['format' => (array) $format, 'parameters' => $params];
+        $format = (array) $format;
+        $format['id'] = (int) $format['id'];
+        $format['source_sections'] = (int) $format['source_sections'];
+        foreach (['is_checked', 'is_edited'] as $k) {
+            $format[$k] = (bool) $format[$k];
+        }
+
+        return ['format' => $format, 'parameters' => $params];
+    }
+
+    /** Test code => [format_type, import_status, is_checked, is_edited, params] for the Test Master list. */
+    public static function overview(): array
+    {
+        $params = DB::table('tbl_web_test_parameters')
+            ->where('row_type', 'PARAM')
+            ->groupBy('test_code')
+            ->select('test_code', DB::raw('COUNT(*) as n'))
+            ->pluck('n', 'test_code');
+
+        $list = [];
+        foreach (DB::table('tbl_web_test_formats')->get(['test_code', 'format_type', 'import_status', 'is_checked', 'is_edited']) as $f) {
+            $list[$f->test_code] = [
+                'format_type' => $f->format_type,
+                'import_status' => $f->import_status,
+                'is_checked' => (bool) $f->is_checked,
+                'is_edited' => (bool) $f->is_edited,
+                'params' => (int) ($params[$f->test_code] ?? 0),
+            ];
+        }
+        return $list;
+    }
+
+    /**
+     * Checks and cleans a format posted from the Test Master. Returns [data, error]:
+     * data is ready for save(), error is a message for the user (data is null then).
+     */
+    public static function fromInput(array $input): array
+    {
+        $str = fn ($v, $max) => ($v = trim((string) ($v ?? ''))) === '' ? null : mb_substr($v, 0, $max);
+        $num = function ($v) {
+            if ($v === null || trim((string) $v) === '') {
+                return null;
+            }
+            $v = str_replace(',', '', trim((string) $v));
+            return is_numeric($v) ? (float) $v : false;
+        };
+
+        $f = $input['format'] ?? [];
+        $type = strtoupper($f['format_type'] ?? 'TABLE') === 'NARRATIVE' ? 'NARRATIVE' : 'TABLE';
+        $format = [
+            'format_type' => $type,
+            'specimen' => $str($f['specimen'] ?? null, 150),
+            'notes_html' => TemplateImportService::sanitizeHtml($f['notes_html'] ?? null),
+            'narrative_html' => TemplateImportService::sanitizeHtml($f['narrative_html'] ?? null),
+        ];
+
+        $parameters = [];
+        foreach (array_values($input['parameters'] ?? []) as $i => $p) {
+            $row = $i + 1;
+            $name = $str($p['name'] ?? null, 255);
+            if (!$name) {
+                return [null, "Row $row: please enter the parameter name (or delete the empty row)."];
+            }
+            $rowType = strtoupper($p['row_type'] ?? 'PARAM') === 'HEADING' ? 'HEADING' : 'PARAM';
+            $resultType = strtoupper($p['result_type'] ?? 'NUMERIC');
+            if (!in_array($resultType, ['NUMERIC', 'TEXT', 'OPTIONS', 'FORMULA'], true)) {
+                $resultType = 'NUMERIC';
+            }
+            $options = $str($p['options'] ?? null, 4000);
+            if ($rowType === 'PARAM' && $resultType === 'OPTIONS' && !$options) {
+                return [null, "$name: a dropdown parameter needs its choices (one per line)."];
+            }
+            $decimals = $p['decimals'] ?? null;
+            $decimals = $decimals === null || $decimals === '' ? null : max(0, min(6, (int) $decimals));
+
+            $ranges = [];
+            foreach (array_values($p['ranges'] ?? []) as $r) {
+                $values = [];
+                foreach (['age_from', 'age_to', 'low', 'high', 'panic_low', 'panic_high'] as $k) {
+                    $values[$k] = $num($r[$k] ?? null);
+                    if ($values[$k] === false) {
+                        return [null, "$name: \"" . $r[$k] . '" is not a number.'];
+                    }
+                }
+                if ($values['low'] === null && $values['high'] === null) {
+                    continue;   // a blank range line
+                }
+                if ($values['low'] !== null && $values['high'] !== null && $values['low'] > $values['high']) {
+                    return [null, "$name: the low value ({$values['low']}) is more than the high value ({$values['high']})."];
+                }
+                if ($values['age_from'] !== null && $values['age_to'] !== null && $values['age_from'] > $values['age_to']) {
+                    return [null, "$name: the age \"from\" is more than the age \"to\"."];
+                }
+                $sex = strtoupper($r['sex'] ?? 'A');
+                $unit = strtoupper($r['age_unit'] ?? 'Y');
+                $ranges[] = $values + [
+                    'sex' => in_array($sex, ['M', 'F'], true) ? $sex : 'A',
+                    'age_unit' => in_array($unit, ['D', 'M'], true) ? $unit : 'Y',
+                ];
+            }
+
+            $parameters[] = [
+                'row_type' => $rowType,
+                'name' => $name,
+                'method' => $rowType === 'PARAM' ? $str($p['method'] ?? null, 255) : null,
+                'unit' => $rowType === 'PARAM' ? $str($p['unit'] ?? null, 60) : null,
+                'result_type' => $resultType,
+                'options' => $resultType === 'OPTIONS' ? $options : null,
+                'default_value' => $rowType === 'PARAM' ? $str($p['default_value'] ?? null, 255) : null,
+                'ref_text' => $rowType === 'PARAM' ? $str($p['ref_text'] ?? null, 4000) : null,
+                'decimals' => $decimals,
+                'formula' => $resultType === 'FORMULA' ? $str($p['formula'] ?? null, 255) : null,
+                'indent' => max(0, min(3, (int) ($p['indent'] ?? 0))),
+                'is_bold' => !empty($p['is_bold']),
+                'is_active' => !array_key_exists('is_active', $p) || !empty($p['is_active']),
+                'ranges' => $rowType === 'PARAM' ? $ranges : [],
+            ];
+        }
+
+        if ($type === 'TABLE' && !array_filter($parameters, fn ($p) => $p['row_type'] === 'PARAM')) {
+            return [null, 'A table report needs at least one parameter. Add one, or change the report type to Narrative.'];
+        }
+        if ($type === 'NARRATIVE') {
+            $parameters = [];
+        }
+
+        return [['format' => $format, 'parameters' => $parameters], null];
+    }
+
+    /** Marks a format as checked (or not) by the lab staff. */
+    public static function setChecked(string $testCode, bool $checked, ?string $user): void
+    {
+        DB::table('tbl_web_test_formats')->where('test_code', $testCode)->update([
+            'is_checked' => $checked,
+            'checked_by' => $checked ? $user : null,
+            'checked_at' => $checked ? now() : null,
+        ]);
+    }
+
+    public static function history(string $testCode): array
+    {
+        return DB::table('tbl_web_test_format_history')
+            ->where('test_code', $testCode)
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get(['id', 'action', 'created_by', 'created_at'])
+            ->map(fn ($h) => (array) $h)
+            ->all();
+    }
+
+    public static function historySnapshot(int $id): ?array
+    {
+        $row = DB::table('tbl_web_test_format_history')->where('id', $id)->first();
+        return $row ? ['test_code' => $row->test_code] + (json_decode($row->snapshot, true) ?: []) : null;
     }
 
     /**

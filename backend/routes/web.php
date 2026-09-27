@@ -2740,6 +2740,589 @@ Route::get('/api/report-templates/download', function (Request $request) {
     return response()->download($service::path($tpl['file']), $tpl['file']);
 });
 
+// ---------------------------------------------------------------------------------------------
+// Test Master: report formats kept in the database (parameters, ranges, narrative text).
+// Imported once from the Word templates (php artisan test-formats:import), then kept by the lab.
+// ---------------------------------------------------------------------------------------------
+
+// Status of every test's format, keyed by test code - for the list badges and counts
+Route::get('/api/test-formats/overview', function () {
+    \App\Services\TestFormatService::ensureSchema();
+    return response()->json((object) \App\Services\TestFormatService::overview());
+});
+
+// One test's format with its parameters and ranges (the original template is fetched separately)
+Route::get('/api/test-formats', function (Request $request) {
+    \App\Services\TestFormatService::ensureSchema();
+    $code = strtoupper(trim($request->query('test_code', '')));
+    if ($code === '') {
+        return response()->json(['error' => 'Test code is required.'], 400);
+    }
+    $data = \App\Services\TestFormatService::get($code);
+    if ($data) {
+        $data['format']['has_source'] = !empty($data['format']['source_html']);
+        unset($data['format']['source_html']);
+    }
+    return response()->json(['test_code' => $code, 'data' => $data]);
+});
+
+// A ready-made starting format for a test without one (nothing is saved): ?test_code=
+Route::get('/api/test-formats/suggest', function (Request $request) {
+    \App\Services\TestFormatService::ensureSchema();
+    $code = strtoupper(trim($request->query('test_code', '')));
+    if ($code === '' || !DB::table('MTest')->where('Code', $code)->exists()) {
+        return response()->json(['error' => 'Test not found.'], 404);
+    }
+    return response()->json(\App\Services\SampleFormatService::suggest($code));
+});
+
+// The Word template the format was imported from, as HTML - shown next to the editor
+Route::get('/api/test-formats/source', function (Request $request) {
+    $code = strtoupper(trim($request->query('test_code', '')));
+    $format = DB::table('tbl_web_test_formats')->where('test_code', $code)->first(['source_file', 'source_html']);
+    if (!$format || !$format->source_html) {
+        return response()->json(['error' => 'No original template is kept for this test.'], 404);
+    }
+    return response()->json(['file' => $format->source_file, 'html' => $format->source_html]);
+});
+
+Route::post('/api/test-formats/save', function (Request $request) {
+    $service = \App\Services\TestFormatService::class;
+    $service::ensureSchema();
+
+    $code = strtoupper(trim($request->input('test_code', '')));
+    $test = $code !== '' ? DB::table('MTest')->where('Code', $code)->first(['Code', 'Descr', 'DeptCode']) : null;
+    if (!$test) {
+        return response()->json(['error' => 'Test not found.'], 404);
+    }
+
+    [$data, $error] = $service::fromInput($request->all());
+    if ($error) {
+        return response()->json(['error' => $error], 422);
+    }
+
+    $isNew = !$service::exists($code);
+    $data['format']['test_name'] = trim($test->Descr ?? '');
+    $data['format']['dept_code'] = trim($test->DeptCode ?? '');
+    $data['format']['is_edited'] = true;
+    $user = getCurrentUserName($request);
+
+    try {
+        $service::save($code, $data, 'EDIT', $user);
+    } catch (\Throwable $e) {
+        return response()->json(['error' => 'Could not save the format: ' . $e->getMessage()], 500);
+    }
+
+    $params = count(array_filter($data['parameters'], fn ($p) => $p['row_type'] === 'PARAM'));
+    logAuditLog(getCurrentUserCode($request), $user, 'TEST_FORMAT', $isNew ? 'CREATE' : 'UPDATE',
+        "Report format of {$code} ({$data['format']['test_name']}) " . ($isNew ? 'created' : 'saved') . ": {$data['format']['format_type']}, {$params} parameter(s)");
+
+    $saved = $service::get($code);
+    $saved['format']['has_source'] = !empty($saved['format']['source_html']);
+    unset($saved['format']['source_html']);
+    return response()->json(['message' => 'Format saved.', 'data' => $saved]);
+});
+
+// Lab staff tick a format as checked (or take the tick back)
+Route::post('/api/test-formats/check', function (Request $request) {
+    $service = \App\Services\TestFormatService::class;
+    $code = strtoupper(trim($request->input('test_code', '')));
+    if (!$service::exists($code)) {
+        return response()->json(['error' => 'Save the format first.'], 404);
+    }
+    $checked = (bool) $request->input('checked', true);
+    $user = getCurrentUserName($request);
+    $service::setChecked($code, $checked, $user);
+    logAuditLog(getCurrentUserCode($request), $user, 'TEST_FORMAT', $checked ? 'CHECKED' : 'UNCHECKED', "Report format of {$code} marked " . ($checked ? 'checked' : 'not checked'));
+
+    $format = DB::table('tbl_web_test_formats')->where('test_code', $code)->first(['is_checked', 'checked_by', 'checked_at']);
+    return response()->json(['is_checked' => (bool) $format->is_checked, 'checked_by' => $format->checked_by, 'checked_at' => $format->checked_at]);
+});
+
+Route::get('/api/test-formats/history', function (Request $request) {
+    $code = strtoupper(trim($request->query('test_code', '')));
+    return response()->json(\App\Services\TestFormatService::history($code));
+});
+
+// One saved version, to look at or load back into the editor
+Route::get('/api/test-formats/history/{id}', function ($id) {
+    $snapshot = \App\Services\TestFormatService::historySnapshot((int) $id);
+    return $snapshot ? response()->json($snapshot) : response()->json(['error' => 'Version not found.'], 404);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Report Entry / Report Approval on the Test Format Master formats (replaces the Word templates).
+// State of a line: PENDING -> DRAFT -> SUBMITTED -> APPROVED (or SENT_BACK -> resubmitted).
+// ---------------------------------------------------------------------------------------------
+
+if (!function_exists('reportEntryRow')) {
+    /** One booking detail line as the Report Entry / Approval lists show it. */
+    function reportEntryRow($row, array $copies, array $formats) {
+        $patient = \App\Services\ReportEntryService::patientOf($row);
+        return [
+            'id' => (int) $row->id,
+            'bookingId' => (int) $row->booking_id,
+            'bookingNo' => $patient['booking_no'],
+            'bookingDate' => $row->booking_date ? date('d-M-Y', strtotime($row->booking_date)) : '',
+            'patientName' => trim($patient['prefix'] . ' ' . $patient['name']),
+            'sex' => $patient['sex'],
+            'age' => $patient['age'],
+            'ageUnit' => $patient['age_unit'],
+            'refDoctor' => $patient['referred_by'],
+            'mobile' => $patient['mobile'],
+            'testCode' => trim((string) $row->test_code),
+            'testName' => trim((string) $row->test_name),
+            'deptName' => trim((string) ($row->dept_label ?? $row->dept_name ?? '')),
+            'sampleStatus' => $row->sample_status,
+            'state' => \App\Services\ReportEntryService::stateOf($row),
+            'hasFormat' => isset($formats[trim((string) $row->test_code)]),
+            'formatType' => $formats[trim((string) $row->test_code)] ?? null,
+            'hasDoctorCopy' => isset($copies[(int) $row->id]),
+            'hasOldReport' => !empty($row->narrative_html),
+            'resultFlag' => $row->result_flag,
+            'savedAt' => $row->report_saved_at,
+            'savedBy' => $row->report_saved_by,
+            'submittedAt' => $row->report_submitted_at,
+            'submittedBy' => $row->report_submitted_by,
+            'approvedAt' => $row->report_approved_at,
+            'approvedBy' => $row->report_approved_by,
+            'sentBackAt' => $row->report_sent_back_at,
+            'sentBackBy' => $row->report_sent_back_by,
+            'note' => $row->report_approval_note,
+            'resubmittedAt' => $row->report_resubmitted_at,
+        ];
+    }
+}
+
+if (!function_exists('reportEntryList')) {
+    /** Lines for the Report Entry / Approval lists: department access, state and search applied. */
+    function reportEntryList(Request $request, ?string $state, bool $withReportOnly) {
+        ensureNarrativeColumns();
+        ensureApprovalColumns();
+        \App\Services\ReportEntryService::ensureSchema();
+        \App\Services\TestFormatService::ensureSchema();
+        \App\Services\ReportPdfService::ensureSchema();
+
+        $query = DB::table('tbl_web_booking_dtl as d')
+            ->join('tbl_web_booking_hdr as h', 'd.booking_id', '=', 'h.id')
+            ->leftJoin('MTest as t', 'd.test_code', '=', 't.Code')
+            ->leftJoin('MDepartment as md', 't.DeptCode', '=', 'md.Code')
+            ->select('d.*', 'h.booking_no', 'h.booking_date', 'h.patient_prefix', 'h.patient_name', 'h.patient_code', 'h.sex',
+                'h.age_year', 'h.age_month', 'h.age_day', 'h.doctor_name', 'h.mobile_no', 'md.Descr as dept_label');
+
+        $allowed = userDeptCodes($request);
+        if ($allowed !== null) {
+            if (!$allowed) {
+                return [];
+            }
+            $query->where(function ($q) use ($allowed) {
+                $q->whereIn(DB::raw('RTRIM(t.DeptCode)'), $allowed)
+                  ->orWhere(fn ($q2) => $q2->whereNull('t.DeptCode')->whereIn(DB::raw('RTRIM(d.dept_code)'), $allowed));
+            });
+        }
+        if ($withReportOnly) {
+            $query->whereNotNull('d.report_json');
+        }
+        if ($state && strtoupper($state) !== 'ALL') {
+            \App\Services\ReportEntryService::whereState($query, $state);
+        }
+        if ($request->query('booking_id')) {
+            $query->where('d.booking_id', (int) $request->query('booking_id'));
+        }
+        $search = trim((string) $request->query('search', ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $like = '%' . $search . '%';
+                $q->where('h.booking_no', 'like', $like)->orWhere('h.patient_name', 'like', $like)
+                  ->orWhere('h.mobile_no', 'like', $like)->orWhere('d.test_name', 'like', $like);
+            });
+        }
+
+        $rows = $query->orderByDesc('d.id')->take(200)->get();
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $copies = DB::table('tbl_web_report_files')->whereIn('dtl_id', $rows->pluck('id'))->where('file_type', 'DOCTOR_COPY')
+            ->pluck('dtl_id')->mapWithKeys(fn ($id) => [(int) $id => true])->all();
+        $formats = DB::table('tbl_web_test_formats')->whereIn('test_code', $rows->pluck('test_code')->map(fn ($c) => trim((string) $c))->unique()->values())
+            ->pluck('format_type', 'test_code')->all();
+
+        return $rows->map(fn ($r) => reportEntryRow($r, $copies, $formats))->values()->all();
+    }
+}
+
+// Report Entry list: ?status=pending|draft|sent_back|submitted|approved|all&search=&booking_id=
+Route::get('/api/report-entry/queue', function (Request $request) {
+    return response()->json(reportEntryList($request, $request->query('status', 'all'), false));
+});
+
+// One line: patient, state, doctor copy and the report (saved one, or a fresh one from the current format)
+if (!function_exists('reportEntryItem')) {
+    /** Everything the Report Entry / Approval / Print screens need for one line, or null when it does not exist. */
+    function reportEntryItem($id) {
+        $service = \App\Services\ReportEntryService::class;
+        ensureNarrativeColumns();
+        ensureApprovalColumns();
+        $service::ensureSchema();
+        \App\Services\TestFormatService::ensureSchema();
+        \App\Services\ReportPdfService::ensureSchema();
+
+        $row = DB::table('tbl_web_booking_dtl as d')
+            ->join('tbl_web_booking_hdr as h', 'd.booking_id', '=', 'h.id')
+            ->leftJoin('MTest as t', 'd.test_code', '=', 't.Code')
+            ->leftJoin('MDepartment as md', 't.DeptCode', '=', 'md.Code')
+            ->leftJoin('MSubDepartment as sd', 't.SubDeptCode', '=', 'sd.Code')
+            ->where('d.id', $id)
+            ->select('d.*', 'h.booking_no', 'h.booking_date', 'h.patient_prefix', 'h.patient_name', 'h.patient_code', 'h.sex',
+                'h.age_year', 'h.age_month', 'h.age_day', 'h.doctor_name', 'h.mobile_no', 'md.Descr as dept_label', 'sd.Descr as sub_dept_label',
+                DB::raw('COALESCE(RTRIM(t.DeptCode), RTRIM(d.dept_code)) as test_dept'))
+            ->first();
+        if (!$row) {
+            return null;
+        }
+
+        $code = trim((string) $row->test_code);
+        $copy = DB::table('tbl_web_report_files')->where('dtl_id', $id)->where('file_type', 'DOCTOR_COPY')->first(['file_name', 'original_name', 'created_at']);
+        $current = $service::formatSnapshot($code);
+        $saved = $row->report_json ? json_decode($row->report_json, true) : null;
+
+        $item = reportEntryRow($row, $copy ? [(int) $id => true] : [], $current ? [$code => $current['format']['format_type']] : []);
+        $item['subDeptName'] = trim((string) ($row->sub_dept_label ?? ''));
+        $item['patient'] = $service::patientOf($row);
+        $item['sampleCollectedAt'] = $row->sample_collected_at;
+        $item['deptReceivedAt'] = $row->dept_received_at;
+        $item['doctorCopy'] = $copy ? ['name' => $copy->original_name ?: $copy->file_name, 'isPdf' => str_ends_with(strtolower($copy->file_name), '.pdf'), 'at' => $copy->created_at] : null;
+        $item['doctor'] = $row->report_doctor ? json_decode($row->report_doctor, true) : null;
+        $item['report'] = $saved ?: $current;
+        $item['isSaved'] = (bool) $saved;
+        // The format was changed in the Test Format Master after this report was started
+        $item['formatChanged'] = $saved && $current
+            && ($saved['format']['updated_at'] ?? null) !== ($current['format']['updated_at'] ?? null);
+        // Opens this booking's approved reports without a login (QR code on the report)
+        $item['reportToken'] = \App\Services\ReportEntryService::bookingToken((int) $row->booking_id);
+        // Reporting doctors of this test's department - the one chosen signs the report
+        $item['deptCode'] = trim((string) $row->test_dept);
+        $item['doctors'] = \App\Services\ReportEntryService::doctorsFor($row->test_dept);
+
+        return $item;
+    }
+}
+
+Route::get('/api/report-entry/item/{id}', function (Request $request, $id) {
+    if (!canWorkOnDtl($request, $id) && !isReportApprover($request)) {
+        return deptDeniedResponse();
+    }
+    $item = reportEntryItem($id);
+    return $item ? response()->json($item) : response()->json(['error' => 'Test line not found.'], 404);
+});
+
+// QR code as SVG, made on this server (nothing is sent to an outside QR service): ?text=
+Route::get('/api/qr', function (Request $request) {
+    $text = (string) $request->query('text', '');
+    if ($text === '' || mb_strlen($text) > 500) {
+        return response('QR text missing or too long.', 400);
+    }
+    if (!class_exists(\chillerlan\QRCode\QRCode::class)) {
+        return response('QR library is not installed on this server (composer install).', 503);
+    }
+    $options = new \chillerlan\QRCode\QROptions([
+        'outputType' => \chillerlan\QRCode\Output\QROutputInterface::MARKUP_SVG,
+        'outputBase64' => false,
+        'eccLevel' => \chillerlan\QRCode\Common\EccLevel::M,
+        'addQuietzone' => true,
+        'quietzoneSize' => 2,   // white border scanners need around the code
+        'svgAddXmlHeader' => true,
+    ]);
+    $svg = (new \chillerlan\QRCode\QRCode($options))->render($text);
+    return response($svg, 200, ['Content-Type' => 'image/svg+xml', 'Cache-Control' => 'public, max-age=86400']);
+});
+
+// Patient's report download page (QR code on the report): the approved reports of one booking.
+// No login - the token is long and random, and only approved reports are ever returned.
+Route::get('/api/public/report/{token}', function ($token) {
+    $token = preg_replace('/[^a-f0-9]/', '', strtolower((string) $token));
+    if (strlen($token) !== 32) {
+        return response()->json(['error' => 'This report link is not valid.'], 404);
+    }
+    \App\Services\ReportEntryService::ensureSchema();
+    $hdr = DB::table('tbl_web_booking_hdr')->where('report_token', $token)->first();
+    if (!$hdr) {
+        return response()->json(['error' => 'This report link is not valid.'], 404);
+    }
+
+    $reports = [];
+    $pending = [];
+    foreach (DB::table('tbl_web_booking_dtl')->where('booking_id', $hdr->id)->orderBy('id')->get(['id', 'test_name', 'report_json', 'report_approved_at']) as $line) {
+        if ($line->report_json && $line->report_approved_at) {
+            $item = reportEntryItem($line->id);
+            if ($item) {
+                // Only what the printed report shows - no internal notes, users or doctor copy
+                $reports[] = array_intersect_key($item, array_flip([
+                    'id', 'bookingNo', 'testName', 'deptName', 'subDeptName', 'patient', 'sampleCollectedAt',
+                    'deptReceivedAt', 'approvedAt', 'doctor', 'report', 'reportToken', 'state',
+                ]));
+            }
+        } else {
+            $pending[] = trim((string) $line->test_name);
+        }
+    }
+
+    $patient = \App\Services\ReportEntryService::patientOf($hdr);
+    return response()->json([
+        'patientName' => trim($patient['prefix'] . ' ' . $patient['name']),
+        'bookingNo' => $patient['booking_no'],
+        'bookingDate' => $hdr->booking_date ? date('d-M-Y', strtotime($hdr->booking_date)) : '',
+        'reports' => $reports,
+        'pending' => $pending,
+    ]);
+})->middleware('throttle:30,1');
+
+// Save a report (draft), or save and submit it for approval: {id, values, narrative_html, notes_html, submit, refresh_format}
+Route::post('/api/report-entry/save', function (Request $request) {
+    $service = \App\Services\ReportEntryService::class;
+    $id = (int) $request->input('id');
+    $submit = (bool) $request->input('submit', false);
+    if (!$id) {
+        return response()->json(['error' => 'Test line is required.'], 400);
+    }
+    if (!canWorkOnDtl($request, $id)) {
+        return deptDeniedResponse();
+    }
+    ensureApprovalColumns();
+    $service::ensureSchema();
+    \App\Services\ReportPdfService::ensureSchema();
+
+    $row = DB::table('tbl_web_booking_dtl')->where('id', $id)->first();
+    if (!$row) {
+        return response()->json(['error' => 'Test line not found.'], 404);
+    }
+    $state = $service::stateOf($row);
+    if ($state === 'SUBMITTED' || $state === 'APPROVED') {
+        return response()->json([
+            'error' => $state === 'APPROVED'
+                ? 'This report is approved and locked. The approver can send it back for correction.'
+                : 'This report is waiting for approval and locked. The approver can send it back for correction.',
+            'code' => 'REPORT_LOCKED',
+        ], 423);
+    }
+
+    $hdr = DB::table('tbl_web_booking_hdr')->where('id', $row->booking_id)->first();
+    $patient = $service::patientOf($hdr);
+
+    // The format snapshot stays with the report once started; "refresh" takes the current format again
+    $saved = $row->report_json ? json_decode($row->report_json, true) : null;
+    $snapshot = ($saved && !$request->boolean('refresh_format')) ? $saved : $service::formatSnapshot(trim((string) $row->test_code));
+    if (!$snapshot) {
+        return response()->json(['error' => 'This test has no report format yet. Create it in Master > Test Format first.', 'code' => 'NO_FORMAT'], 422);
+    }
+
+    $values = (array) $request->input('values', []);
+    if ($saved && $request->boolean('refresh_format')) {
+        // New format, new parameter ids: carry the typed values over by parameter name
+        $norm = fn ($s) => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $s));
+        $byName = [];
+        foreach ($saved['parameters'] as $p) {
+            if ($p['row_type'] === 'PARAM') {
+                $byName[$norm($p['name'])] = $values[(string) $p['id']] ?? '';
+            }
+        }
+        $values = [];
+        foreach ($snapshot['parameters'] as $p) {
+            if ($p['row_type'] === 'PARAM') {
+                $values[(string) $p['id']] = $byName[$norm($p['name'])] ?? '';
+            }
+        }
+    }
+    $built = $service::build($snapshot, $values, $request->input('narrative_html'), $request->input('notes_html'), $patient);
+    $user = getCurrentUserName($request);
+
+    // Reporting doctor chosen in Report Entry: must be one who signs reports of this test's department
+    $testDept = DB::table('tbl_web_booking_dtl as d')->leftJoin('MTest as t', 'd.test_code', '=', 't.Code')->where('d.id', $id)
+        ->selectRaw('COALESCE(RTRIM(t.DeptCode), RTRIM(d.dept_code)) as dept')->value('dept');
+    $doctor = null;
+    if (trim((string) $request->input('doctor_code', '')) !== '') {
+        $doctor = $service::doctorByCode($request->input('doctor_code'), $testDept);
+        if (!$doctor) {
+            return response()->json(['error' => 'That doctor does not report tests of this department. Please choose from the list.'], 422);
+        }
+    } elseif ($saved && $row->report_doctor) {
+        $doctor = json_decode($row->report_doctor, true);
+    }
+    if ($submit && !$doctor) {
+        return response()->json(['error' => 'Please choose the reporting doctor - the doctor who checked this report. Their name is printed as the signature.', 'code' => 'DOCTOR_REQUIRED'], 422);
+    }
+
+    $hasCopy = DB::table('tbl_web_report_files')->where('dtl_id', $id)->where('file_type', 'DOCTOR_COPY')->exists();
+    if ($submit && !$hasCopy) {
+        return response()->json(['error' => 'Please upload the doctor copy before sending the report for approval. It is kept for cross-checking.', 'code' => 'DOCTOR_COPY_REQUIRED'], 422);
+    }
+
+    $update = [
+        'report_json' => json_encode($built['report'], JSON_UNESCAPED_UNICODE),
+        'report_saved_at' => now(),
+        'report_saved_by' => $user,
+        'result_json' => json_encode($built['result_json'], JSON_UNESCAPED_UNICODE),
+        'result_flag' => $built['result_flag'],
+        'result_entered_at' => now(),
+        'result_entered_by' => $user,
+    ];
+    if (!$saved) {
+        // First report on the new formats: approval marks left by the old Word-template flow do not carry over
+        $update += [
+            'report_approved_at' => null, 'report_approved_by' => null, 'report_approval_note' => null,
+            'report_sent_back_at' => null, 'report_sent_back_by' => null,
+            'report_resubmitted_at' => null, 'report_resubmitted_by' => null,
+            'report_submitted_at' => null, 'report_submitted_by' => null, 'report_doctor' => null,
+        ];
+    }
+    $update['report_doctor'] = $doctor ? json_encode($doctor, JSON_UNESCAPED_UNICODE) : null;
+    if ($submit) {
+        $update = array_merge($update, [
+            'report_submitted_at' => now(),
+            'report_submitted_by' => $user,
+            'test_status' => 'RESULT_ENTERED',
+        ]);
+        if ($state === 'SENT_BACK') {
+            $update = array_merge($update, ['report_resubmitted_at' => now(), 'report_resubmitted_by' => $user, 'report_sent_back_at' => null, 'report_sent_back_by' => null]);
+        }
+    }
+    DB::table('tbl_web_booking_dtl')->where('id', $id)->update($update);
+
+    if ($submit) {
+        $who = trim($row->test_name ?? 'Report') . ' of ' . trim($hdr->patient_name ?? '') . ' (' . trim($hdr->booking_no ?? '') . ')';
+        \App\Services\NotificationService::send(\App\Services\NotificationService::approvers(), [
+            'type' => $state === 'SENT_BACK' ? 'REPORT_RESUBMITTED' : 'REPORT_READY',
+            'title' => $state === 'SENT_BACK' ? 'Corrected report ready for approval' : 'Report ready for approval',
+            'message' => $state === 'SENT_BACK' ? "$who was corrected and sent again." : "$who was entered by $user and is waiting for approval.",
+            'link' => '/lab/approval?id=' . $id,
+            'ref_type' => 'BOOKING_DTL',
+            'ref_id' => $id,
+            'created_by' => getCurrentUserCode($request),
+            'created_by_name' => $user,
+            'dedupe' => true,
+        ]);
+    }
+    logAuditLog(getCurrentUserCode($request), $user, 'REPORT_ENTRY', $submit ? 'SUBMIT' : 'SAVE_DRAFT',
+        ($submit ? 'Report submitted for approval' : 'Report draft saved') . " for booking detail #$id ({$row->test_name})" . ($state === 'SENT_BACK' && $submit ? ' - correction after send back' : ''));
+
+    $fresh = DB::table('tbl_web_booking_dtl')->where('id', $id)->first();
+    return response()->json([
+        'message' => $submit ? 'Report sent for approval.' : 'Draft saved.',
+        'state' => $service::stateOf($fresh),
+        'report' => $built['report'],
+        'missing' => $service::missingValues($built['report']),
+    ]);
+});
+
+// Report Approval list: ?status=pending|sent_back|approved|all&search=
+Route::get('/api/report-approval/queue', function (Request $request) {
+    $status = strtolower((string) $request->query('status', 'pending'));
+    $state = ['pending' => 'SUBMITTED', 'sent_back' => 'SENT_BACK', 'approved' => 'APPROVED'][$status] ?? 'ALL';
+    $list = reportEntryList($request, $state, true);
+    if ($state === 'ALL') {
+        $list = array_values(array_filter($list, fn ($r) => $r['state'] !== 'DRAFT' || $r['sentBackAt']));
+    }
+    return response()->json($list);
+});
+
+// Approve (with the signing doctor) or send back with a comment: {id, approve, note, doctor: {name, designation}}
+Route::post('/api/report-approval/decide', function (Request $request) {
+    $service = \App\Services\ReportEntryService::class;
+    $id = (int) $request->input('id');
+    $approve = (bool) $request->input('approve');
+    $note = trim((string) $request->input('note', ''));
+    if (!$id) {
+        return response()->json(['error' => 'Test line is required.'], 400);
+    }
+    if (!isReportApprover($request)) {
+        return response()->json(['error' => 'Only report approvers can approve or send back reports.', 'code' => 'NOT_APPROVER'], 403);
+    }
+    if (!canWorkOnDtl($request, $id)) {
+        return deptDeniedResponse();
+    }
+    ensureApprovalColumns();
+    $service::ensureSchema();
+
+    $row = DB::table('tbl_web_booking_dtl')->where('id', $id)->first();
+    if (!$row || !$row->report_json) {
+        return response()->json(['error' => 'No report has been entered for this test yet.'], 404);
+    }
+    $state = $service::stateOf($row);
+    $user = getCurrentUserName($request);
+    $hdr = DB::table('tbl_web_booking_hdr')->where('id', $row->booking_id)->first();
+    $who = trim($row->test_name ?? 'Report') . ' of ' . trim($hdr->patient_name ?? '') . ' (' . trim($hdr->booking_no ?? '') . ')';
+
+    if ($approve) {
+        if ($state !== 'SUBMITTED') {
+            return response()->json(['error' => $state === 'APPROVED' ? 'This report is already approved.' : 'This report has not been sent for approval.'], 409);
+        }
+        if (!DB::table('tbl_web_report_files')->where('dtl_id', $id)->where('file_type', 'DOCTOR_COPY')->exists()) {
+            return response()->json(['error' => 'The doctor copy is missing - it is needed to cross-check the report.', 'code' => 'DOCTOR_COPY_REQUIRED'], 422);
+        }
+        $testDept = DB::table('tbl_web_booking_dtl as d')->leftJoin('MTest as t', 'd.test_code', '=', 't.Code')->where('d.id', $id)
+            ->selectRaw('COALESCE(RTRIM(t.DeptCode), RTRIM(d.dept_code)) as dept')->value('dept');
+        $doctor = trim((string) $request->input('doctor_code', '')) !== ''
+            ? $service::doctorByCode($request->input('doctor_code'), $testDept)
+            : ($row->report_doctor ? json_decode($row->report_doctor, true) : null);
+        if (!$doctor || trim((string) ($doctor['name'] ?? '')) === '') {
+            return response()->json(['error' => 'Please choose the reporting doctor who signs this report.'], 422);
+        }
+        DB::table('tbl_web_booking_dtl')->where('id', $id)->update([
+            'report_approved_at' => now(),
+            'report_approved_by' => $user,
+            'report_approval_note' => $note !== '' ? mb_substr($note, 0, 500) : null,
+            'report_doctor' => json_encode($doctor, JSON_UNESCAPED_UNICODE),
+            'report_sent_back_at' => null,
+            'report_sent_back_by' => null,
+            'test_status' => 'VERIFIED',
+            'verified_at' => now(),
+            'verified_by' => $user,
+        ]);
+        $type = 'REPORT_APPROVED';
+        $title = 'Report approved';
+        $message = "$who was approved by $user" . ($note !== '' ? ": $note" : '.');
+        $audit = 'APPROVE';
+    } else {
+        if ($note === '') {
+            return response()->json(['error' => 'Please write what needs to be corrected.'], 422);
+        }
+        if ($state !== 'SUBMITTED' && $state !== 'APPROVED') {
+            return response()->json(['error' => 'Only a report waiting for approval, or an approved one, can be sent back.'], 409);
+        }
+        DB::table('tbl_web_booking_dtl')->where('id', $id)->update([
+            'report_approved_at' => null,
+            'report_approved_by' => null,
+            'report_approval_note' => mb_substr($note, 0, 500),
+            'report_sent_back_at' => now(),
+            'report_sent_back_by' => $user,
+            'report_submitted_at' => null,
+            'report_submitted_by' => null,
+            'test_status' => 'RESULT_ENTERED',
+            'verified_at' => null,
+            'verified_by' => null,
+        ]);
+        $type = 'REPORT_SENT_BACK';
+        $title = 'Report sent back for correction';
+        $message = "$who was sent back by $user: $note";
+        $audit = 'SEND_BACK';
+    }
+
+    $writer = \App\Services\NotificationService::codeForName($row->report_saved_by ?: $row->result_entered_by);
+    if ($writer) {
+        \App\Services\NotificationService::send([$writer], [
+            'type' => $type, 'title' => $title, 'message' => $message,
+            'link' => '/lab/report-entry?id=' . $id,
+            'ref_type' => 'BOOKING_DTL', 'ref_id' => $id,
+            'created_by' => getCurrentUserCode($request), 'created_by_name' => $user,
+        ]);
+    }
+    logAuditLog(getCurrentUserCode($request), $user, 'REPORT_APPROVAL', $audit, "$who: " . ($approve ? 'approved' : 'sent back') . ($note !== '' ? " - $note" : ''));
+
+    $fresh = DB::table('tbl_web_booking_dtl')->where('id', $id)->first();
+    return response()->json(['message' => $approve ? 'Report approved.' : 'Report sent back.', 'state' => $service::stateOf($fresh)]);
+});
+
 // Save the filled template report for one test line
 Route::post('/api/sample-tracking/save-narrative', function (Request $request) {
     $dtlId = $request->input('id');

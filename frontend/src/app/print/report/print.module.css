@@ -1,0 +1,96 @@
+.wrap {
+  min-height: 100vh;
+  background: #e5e7eb;
+  padding: 72px 0 32px 0;
+}
+
+.toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 24px;
+  background: #0b3a6e;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: Arial, sans-serif;
+}
+
+.warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #fde68a;
+  font-size: 13px;
+}
+
+.printBtn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0b3a6e;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.printBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sheet {
+  margin: 0 auto 24px auto;
+  width: 210mm;
+}
+
+.message {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  font-family: Arial, sans-serif;
+  color: #374151;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  .wrap {
+    background: #ffffff;
+    padding: 0;
+  }
+
+  .toolbar {
+    display: none;
+  }
+
+  .sheet {
+    margin: 0;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .sheet > div {
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
