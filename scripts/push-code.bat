@@ -9,6 +9,9 @@ echo ======================================================================
 echo.
 
 set "ROOT_DIR=%~dp0..\"
+
+rem New repository - every push also goes here
+set "V2_URL=https://github.com/tanmaydas26/SDC_v2.git"
 cd /d "%ROOT_DIR%"
 
 where git >nul 2>&1
@@ -55,6 +58,8 @@ set "MSG=%MSG:"='%"
 
 git add -A
 if errorlevel 1 goto :fail
+rem QR code library: backend\vendor is git-ignored, but this package is needed on every PC
+if exist "backend\vendor\chillerlan" git add -f backend/vendor/chillerlan
 git commit -m "%MSG%"
 if errorlevel 1 goto :fail
 echo.
@@ -68,13 +73,22 @@ set /p "CONFIRM_MAIN=Push directly to main? (Y/N): "
 if /i not "%CONFIRM_MAIN%"=="Y" goto :cancel
 
 :do_push
-echo Pushing branch "%BRANCH%" to GitHub...
+echo Pushing branch "%BRANCH%" to GitHub (origin - office PCs update from here)...
 git push -u origin "%BRANCH%"
 if errorlevel 1 goto :fail
+
+rem ---- Also push to the new repository SDC_v2 (added on this PC when missing) ----
+git remote get-url v2 >nul 2>&1 || git remote add v2 %V2_URL%
+echo.
+echo Pushing branch "%BRANCH%" to SDC_v2 (%V2_URL%)...
+git push v2 "%BRANCH%"
+if errorlevel 1 goto :fail_v2
 
 echo.
 echo ======================================================================
 echo  [DONE] Code pushed to GitHub! Branch: %BRANCH%
+echo         origin : https://github.com/sourav980434/SDC
+echo         SDC_v2 : %V2_URL%
 echo ======================================================================
 echo.
 pause
@@ -83,6 +97,13 @@ exit /b 0
 :cancel
 echo.
 echo [CANCELLED] Nothing was pushed.
+pause
+exit /b 1
+
+:fail_v2
+echo.
+echo [WARNING] Code is on origin (office PCs get it), but the push to SDC_v2 failed.
+echo           Read the message above. To try SDC_v2 again: git push v2 %BRANCH%
 pause
 exit /b 1
 
