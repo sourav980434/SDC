@@ -10,3 +10,9 @@
 REPORT_MASTER/_versions/
 REPORT_MASTER/_deleted/
 REPORT_MASTER/_defaults.json
+# temp folders from a crashed conversion
+REPORT_MASTER/_html/work_*/
+
+# Generated patient report PDFs - tracked during the development phase
+!reports/
+!reports/**

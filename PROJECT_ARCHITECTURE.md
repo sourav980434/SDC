@@ -71,12 +71,61 @@ The application operates with a **strict separation** between the historical leg
 
 ### 4. Word Report Template APIs (`App\Services\ReportTemplateService`)
 - Templates live in `REPORT_TEMPLATE_PATH` (default `backend/storage/app/REPORT_MASTER`, not in git) and are linked to tests by file name (`T<test>_D<variant>_<stamp>.dot`, `U<user>_T<test>_<stamp>.dot`).
-- Converted to HTML by **MS Word on the server PC** and cached in `storage/app/private/report_template_cache`. Pre-convert all: `php artisan report-templates:warm`.
+- Converted to HTML **once** (MS Word if available, else LibreOffice) and cached in `REPORT_MASTER/_html`, keyed by file content — so the converted copies travel with the folder (git / copy) and **a cloud server needs no Word or LibreOffice to open reports**. Pre-convert all: `php artisan report-templates:warm`.
+- Converter chain (best layout first), used **only** when a template has no converted copy yet:
+  1. **MS Word** (COM, Windows) — best fidelity, reads legacy `.dot`
+  2. **LibreOffice** (`soffice --headless`) — Linux / cloud, reads legacy `.dot`
+  3. **PHPWord** (`phpoffice/phpword`) — pure PHP, no OS dependency; `.docx` / `.rtf` well, legacy `.doc`/`.dot` roughly
+  A file that one converter cannot handle is retried with the next.
+- `GET /api/report-templates/status` reports `converter`, `converters` and `coverage`.
+  `php artisan report-templates:check` prints the same on the console; `report-templates:warm` converts what is pending.
+- **Uploading or replacing a template converts it immediately** (`convertTemplateNow()`), so the report editor never waits for a converter and never fails later. The response carries `converted` / `convert_error`, and the page warns when the server has no converter.
 - `GET /api/report-templates/status` — `word_installed`, `folder_exists`, `linked_tests`.
 - `GET /api/report-templates/lookup?codes=T1,T2` — template count per test code.
 - `GET /api/report-templates?test_code=` — templates for one test, default first.
 - `GET /api/report-templates/content?file=` — `{scope, css, html, page}`; `503 WORD_NOT_INSTALLED` when Word is missing.
-- `POST /api/sample-tracking/save-narrative` — saves the filled report to `tbl_web_booking_dtl.narrative_html`.
+- `POST /api/sample-tracking/save-narrative` — saves the filled report to `tbl_web_booking_dtl.narrative_html` **and writes a PDF copy** (see below).
+
+### 5. Report PDF files (`App\Services\ReportPdfService`)
+- Every saved report is rendered to PDF with **mpdf/mpdf** (pure PHP — no Word, no wkhtmltopdf, works on a cloud server) and stored at `storage/app/reports/<yyyy-mm>/<booking no>/<test code>_<detail id>.pdf` (never committed to git — patient data).
+- Recorded in **`tbl_web_report_files`** (booking id/no, patient code, patient name, mobile no, test, file path/size, created by) and on `tbl_web_booking_dtl.report_pdf_path` / `report_pdf_at`. Table and columns are created automatically on first save.
+- `GET /api/lab/report-pdf/{dtlId}` — opens the PDF (`?download=1` to download); generates it on the fly if it is missing.
+- **Doctor copy** (the signed hard copy, uploaded from the report editor): `POST /api/lab/doctor-copy` (`id`, `file`) — images are converted to **WebP** and compressed until at least **25% smaller** than the upload (max side 2200 px); PDFs are kept as-is up to **3 MB**. Stored beside the report PDF as `DOCTOR_COPY_<test>_<detail id>.webp|pdf` and recorded in `tbl_web_report_files` with `file_type = DOCTOR_COPY`.
+- `GET /api/lab/doctor-copy/{dtlId}` — opens it (`?download=1` to download).
+- **The doctor copy is mandatory:** `save-narrative` returns `422 DOCTOR_COPY_REQUIRED` when no `DOCTOR_COPY` row exists for that test line, and the editor blocks Save / Save & Print with the same message.
+- `GET /api/lab/report-files?booking_no=&patient_code=&mobile_no=` — every stored file (both types) for a bill or a patient; the list a WhatsApp / email sender will use later.
+- PHP needs `extension=gd` (WebP) and `upload_max_filesize` ≥ 4M for the 3 MB PDF limit.
+
+### 5.1 Report letterhead (`App\Services\LetterheadService`)
+- One full **A4 portrait image** uploaded in **SetUp → Lab & Report Settings** is the letterhead every report PDF / print is produced on; the app's own header block is then left out.
+- Any image format is converted to **WebP** (max 2480 px wide) and stored as `storage/app/settings/letterhead.webp`; the file name is kept in `tbl_web_settings.letterhead_image`, with a disk fallback when the database is unreachable.
+- `letterhead_top_mm` / `letterhead_bottom_mm` leave room for the printed header and footer (defaults 45 / 25 mm).
+- `GET /api/setup/letterhead`, `POST /api/setup/letterhead`, `POST /api/setup/letterhead/remove`.
+
+### 6. Report Approval (`/lab/report-approval`, module `report_approval`)
+- Every written report is shown **next to its doctor copy** (report PDF in one pane, the uploaded WebP/PDF in the other) so they can be matched before approval.
+- `GET /api/lab/approval-queue?status=pending|approved|all&search=` — reports with a saved narrative, with `hasDoctorCopy` / `approvedAt`.
+- `POST /api/lab/approve-report` (`id`, `approve`, `note`) — approving sets `report_approved_at/by`, the optional note and `test_status = VERIFIED`; `approve=false` sends it back (`RESULT_ENTERED`). Approving without a doctor copy is refused (`422 DOCTOR_COPY_REQUIRED`).
+- `GET /api/lab/approval-item/{dtlId}` — one report for the full-tab review page `/lab/report-approval/review?id=`.
+- Sending back **requires a comment** (`422` without it); it sets `report_sent_back_at/by` and the comment is shown on the test card in Lab Result Entry, so the report can be corrected and the doctor copy re-uploaded.
+- Columns `report_approved_at`, `report_approved_by`, `report_approval_note`, `report_sent_back_at`, `report_sent_back_by` are created automatically on first use.
+
+---
+
+### 8. Notifications (`App\\Services\\NotificationService`, bell + `/notifications`)
+- One row per receiver in **`tbl_web_notifications`** (created on first use), so "read" is per user.
+- Sent when work moves between people: **REPORT_READY** (a report was saved — to everyone with the `report_approval` module and admins), **REPORT_RESUBMITTED** (a report sent back was corrected and saved again — same receivers), **REPORT_SENT_BACK** (to the user who wrote the report), **REPORT_APPROVED** (to the writer). Nobody is notified about their own action, and `dedupe` stops repeated saves from repeating an unread notification.
+- `GET /api/notifications` (`unread=1` for the bell, else a paged list), `POST /api/notifications/read` (`id` for one, empty for all).
+- The header bell shows the unread count, refreshes every 60 s, and opening a notification marks it read and jumps to its page. Read ones stay on `/notifications`.
+- A report saved after being sent back sets `report_resubmitted_at/by`; the approval list shows a **Corrected** badge and a "corrected and saved again" bar.
+
+---
+
+### 7. Department-wise lab access (server side)
+- A user works only in the departments given in **User Management → Departments** (`tbl_web_user_dept_access`); users with role `ADMIN` see everything.
+- `userDeptCodes($request)` reads them from the `X-User-Code` header (cached 60 s, cleared when the user is saved); `canWorkOnDtl($request, $dtlId)` compares them with the test's department (`MTest.DeptCode`, else `tbl_web_booking_dtl.dept_code`).
+- Enforced on: `sample-tracking/queue` (list), `save-result`, `save-parameter-results`, `save-narrative`, `verify`, `lab/doctor-copy`, `lab/approval-queue` and `lab/approve-report`. A test from another department returns `403 DEPARTMENT_NOT_ALLOWED`.
+- A user with **no** department assigned gets an empty worklist and cannot save anything.
 
 ---
 

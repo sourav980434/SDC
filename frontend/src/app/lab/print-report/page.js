@@ -16,6 +16,7 @@ function PrintReportContent() {
 
   const [reportData, setReportData] = useState(null);
   const [labCfg, setLabCfg] = useState(DEFAULT_LAB_CONFIG);
+  const [letterhead, setLetterhead] = useState(null);   // { url, topMm, bottomMm } when one is uploaded
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [mounted, setMounted] = useState(false);
@@ -23,7 +24,16 @@ function PrintReportContent() {
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    fetchLabSettings().then(cfg => setLabCfg(cfg));
+    fetchLabSettings().then(cfg => {
+      setLabCfg(cfg);
+      if (cfg?.letterhead_image) {
+        setLetterhead({
+          url: `${API_BASE}/api/setup/letterhead?v=${encodeURIComponent(cfg.letterhead_image)}`,
+          topMm: Number(cfg.letterhead_top_mm) || 45,
+          bottomMm: Number(cfg.letterhead_bottom_mm) || 25,
+        });
+      }
+    });
 
     if (!bookingId) {
       setError('No Booking ID provided.');
@@ -73,9 +83,13 @@ function PrintReportContent() {
   }
 
   const { header } = reportData;
-  const test_items = itemId
+  const requested = itemId
     ? reportData.test_items.filter(it => String(it.id) === String(itemId))
     : reportData.test_items;
+
+  // Reports print only after they are approved in Report Approval
+  const test_items = requested.filter(it => it.is_approved !== false);
+  const waiting = requested.filter(it => it.is_approved === false);
 
   const pathologyItems = test_items.filter(it => it.result_json && it.result_json.length > 0);
   const narrativeItems = test_items.filter(it => it.narrative_html || (!it.result_json || it.result_json.length === 0));
@@ -105,10 +119,17 @@ function PrintReportContent() {
 
       {/* Report Canvas Container */}
       <div className={styles.bgWrapper}>
-        <div className={styles.reportContainer}>
+        <div
+          className={`${styles.reportContainer} ${letterhead ? styles.onLetterhead : ''}`}
+          style={letterhead ? {
+            backgroundImage: `url(${letterhead.url})`,
+            paddingTop: `${letterhead.topMm}mm`,
+            paddingBottom: `${letterhead.bottomMm}mm`,
+          } : undefined}
+        >
 
-          {/* 1. Official Dynamic Header */}
-          <div style={{ borderBottom: '2.5px solid #0f172a', paddingBottom: '12px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          {/* 1. Official Dynamic Header - the printed letterhead already has it */}
+          <div style={{ display: letterhead ? 'none' : 'flex', borderBottom: '2.5px solid #0f172a', paddingBottom: '12px', marginBottom: '16px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', margin: 0, textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
                 {labCfg.lab_name}
@@ -191,6 +212,13 @@ function PrintReportContent() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {waiting.length > 0 && (
+            <div className="no-print" style={{ margin: '0 0 18px 0', padding: '14px 16px', borderRadius: '8px', backgroundColor: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', fontSize: '13px' }}>
+              <strong>Waiting for approval:</strong>{' '}
+              {waiting.map(it => it.test_name).join(', ')} — {waiting.length === 1 ? 'this report is' : 'these reports are'} not approved yet, so {waiting.length === 1 ? 'it is' : 'they are'} left out of the print. Please get {waiting.length === 1 ? 'it' : 'them'} approved in Report Approval first.
             </div>
           )}
 

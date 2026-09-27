@@ -105,3 +105,54 @@
 .templateDoc :global(table) {
   max-width: 100%;
 }
+
+/* Word pins letterhead rules with position + z-index; reports saved before that was
+   cleaned up would draw them across the text */
+.templateDoc :global([style*="z-index"]) {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+}
+
+/* Word's letterhead rule: a hair-thin, over-wide image. Reports saved before it was converted
+   into a plain rule keep the image, so it is kept inside the page here. */
+.templateDoc :global(img[height="1"]),
+.templateDoc :global(img[height="2"]),
+.templateDoc :global(img[height="3"]),
+.templateDoc :global(img[height="4"]) {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 1px !important;
+  margin: 8px auto !important;
+}
+
+.templateDoc :global(img),
+.templateDoc :global(table) {
+  max-width: 100%;
+}
+
+.templateDoc :global(hr) {
+  border: none;
+  border-top: 1px solid #000;
+  width: 100%;
+  margin: 8px 0;
+}
+
+/* Reports printed on the uploaded A4 letterhead image */
+.onLetterhead {
+  background-repeat: no-repeat;
+  background-position: top center;
+  background-size: 210mm 297mm;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@media print {
+  .onLetterhead {
+    padding-left: 12mm !important;
+    padding-right: 12mm !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

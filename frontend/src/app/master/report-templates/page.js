@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Search, Upload, Download, Eye, Trash2, CheckCircle, FileText, X, TriangleAlert, RefreshCw, FileUp } from 'lucide-react';
 import styles from '../master.module.css';
 import local from './templates.module.css';
@@ -8,6 +9,7 @@ import local from './templates.module.css';
 import API_BASE from '@/lib/apiConfig';
 import { useAlert } from '@/components/AlertDialog';
 import { useAuth } from '@/context/AuthContext';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import SearchableSelect from '@/components/SearchableSelect';
 
 const FILTERS = [
@@ -16,7 +18,9 @@ const FILTERS = [
   { key: 'without', label: 'Without Template' },
 ];
 
-export default function ReportTemplateMaster() {
+function ReportTemplateMasterContent() {
+  const searchParams = useSearchParams();
+  const perms = useActionPermission('report_templates');
   const { showAlert } = useAlert();
   const { user: activeUser } = useAuth();
   const userHeader = { 'X-User-Name': activeUser?.username || 'System' };
@@ -68,6 +72,18 @@ export default function ReportTemplateMaster() {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // /master/report-templates?test=T0000671 - opened from Lab Result Entry
+  useEffect(() => {
+    const code = (searchParams?.get('test') || '').trim().toUpperCase();
+    if (!code || selected || tests.length === 0) return;
+    const test = tests.find(t => t.code.toUpperCase() === code);
+    if (test) {
+      setSearch(code);
+      selectTest(test);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tests, searchParams]);
 
   const visibleTests = useMemo(() => {
     const q = search.trim().toUpperCase();
@@ -175,11 +191,13 @@ export default function ReportTemplateMaster() {
       if (!res.ok) throw new Error(data.error || 'Update failed.');
 
       applyTemplates(selected.code, data.templates || []);
-      showAlert({
-        type: 'success',
-        title: 'Template updated',
-        message: `${data.file} now uses "${file.name}". New reports will open with the updated format; already saved patient reports are not changed. The old file is kept in REPORT_MASTER\\_versions.`,
-      });
+      showAlert(data.converted === false
+        ? { type: 'warning', title: 'Updated, but not converted', message: `${data.file} now uses "${file.name}". ${data.convert_error || ''}` }
+        : {
+            type: 'success',
+            title: 'Template updated',
+            message: `${data.file} now uses "${file.name}" and is prepared for the report editor. Already saved patient reports are not changed. The old file is kept in REPORT_MASTER\\_versions.`,
+          });
     } catch (err) {
       showAlert({ type: 'error', title: 'Template not updated', message: err.message });
     } finally {
@@ -214,7 +232,9 @@ export default function ReportTemplateMaster() {
       applyTemplates(selected.code, data.templates || []);
       setUploadFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      showAlert({ type: 'success', title: 'Template uploaded', message: `Saved as ${data.file}. It is now available in Lab Result Entry for ${selected.name}.` });
+      showAlert(data.converted === false
+        ? { type: 'warning', title: 'Uploaded, but not converted', message: `Saved as ${data.file}. ${data.convert_error || ''}` }
+        : { type: 'success', title: 'Template uploaded', message: `Saved as ${data.file} and prepared for the report editor. It is now available in Lab Result Entry for ${selected.name}.` });
     } catch (err) {
       showAlert({ type: 'error', title: 'Upload failed', message: err.message });
     } finally {
@@ -227,7 +247,7 @@ export default function ReportTemplateMaster() {
     fetch(`${API_BASE}/api/report-templates/content?file=${encodeURIComponent(tpl.file)}`)
       .then(async res => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.code === 'WORD_NOT_INSTALLED' ? 'Microsoft Word is not installed on the server PC.' : (data.error || 'Could not open this template.'));
+        if (!res.ok) throw new Error(data.error || 'Could not open this template.');
         setPreview({ file: tpl.file, loading: false, css: data.css, html: data.html, scope: data.scope });
       })
       .catch(err => setPreview({ file: tpl.file, loading: false, error: err.message }));
@@ -242,6 +262,16 @@ export default function ReportTemplateMaster() {
   }, [preview]);
 
   const withTemplateCount = tests.filter(t => counts[t.code]).length;
+
+  if (perms.isLoaded && !perms.can_view) {
+    return (
+      <div className={local.empty}>
+        <TriangleAlert size={36} color="#dc2626" />
+        <h3>Access Denied</h3>
+        <p>You do not have permission to manage report templates. Please ask the administrator for the <strong>Report Template Master</strong> module.</p>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
@@ -486,7 +516,7 @@ export default function ReportTemplateMaster() {
               <button type="button" className={local.iconBtn} onClick={() => setPreview(null)} title="Close (Esc)"><X size={18} /></button>
             </div>
             <div className={local.modalBody}>
-              {preview.loading && <div className={local.muted}>Opening template with Microsoft Word...</div>}
+              {preview.loading && <div className={local.muted}>Opening template...</div>}
               {preview.error && <div className={local.noTemplate}>{preview.error}</div>}
               {preview.html && (
                 <div className={local.paper}>
@@ -499,5 +529,13 @@ export default function ReportTemplateMaster() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ReportTemplateMaster() {
+  return (
+    <Suspense fallback={<div style={{ padding: '60px 20px', textAlign: 'center' }}>Loading report templates...</div>}>
+      <ReportTemplateMasterContent />
+    </Suspense>
   );
 }

@@ -692,3 +692,306 @@
   letter-spacing: 0.02em;
   color: #fde68a;
 }
+
+/* Account menu in the top bar (user card, Support, Help, Log Off) */
+.profileWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profileBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  background-color: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.profileBtn:hover {
+  background-color: var(--surface-container-high);
+}
+
+.profileAvatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  color: var(--on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.profileText {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  min-width: 0;
+}
+
+.profileName {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1.2;
+}
+
+.profileRole {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--outline);
+  line-height: 1.2;
+}
+
+.profileChevron,
+.profileChevronOpen {
+  color: var(--outline);
+  transition: transform 0.15s ease;
+}
+
+.profileChevronOpen {
+  transform: rotate(180deg);
+}
+
+.profileMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1200;
+  min-width: 232px;
+  padding: 6px;
+  background-color: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+}
+
+.profileHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-container-high);
+}
+
+.profileAvatarLarge {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  color: var(--on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.profileHeaderName {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profileHeaderRole {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--outline);
+  text-transform: uppercase;
+}
+
+.profileItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  color: var(--on-surface, #1e293b);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.profileItem:hover {
+  background-color: var(--surface-container-high);
+  color: var(--primary);
+}
+
+.profileLogout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 9px 12px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  background-color: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.profileLogout:hover {
+  background-color: #fee2e2;
+}
+
+/* Menu collapse toggle in the top bar (left of the lab name) */
+.collapseBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--on-primary, #ffffff);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.collapseBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 768px) {
+  .collapseBtn {
+    display: none;
+  }
+}
+
+/* Notification bell */
+.bellWrap {
+  position: relative;
+}
+
+.bellCount {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+}
+
+.bellMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1200;
+  width: 340px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+}
+
+.bellHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.bellHead button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--outline);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bellEmpty {
+  padding: 22px 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--outline);
+}
+
+.bellItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bellItem:hover {
+  background: var(--surface-container-high);
+}
+
+.bellItemTitle {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.bellItemMsg {
+  font-size: 12px;
+  color: var(--on-surface-variant, #475569);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bellItemMeta {
+  font-size: 10.5px;
+  color: var(--outline);
+}
+
+.bellAll {
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px;
+  border: none;
+  border-top: 1px solid var(--outline-variant);
+  background: transparent;
+  color: var(--primary);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bellAll:hover {
+  background: var(--surface-container-high);
+}

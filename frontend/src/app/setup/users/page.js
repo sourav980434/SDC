@@ -5,6 +5,7 @@ import styles from './users.module.css';
 import { UserPlus, Edit3, Shield, Key, Check, X, Building2, LayoutGrid, Sparkles } from 'lucide-react';
 
 import API_BASE from '@/lib/apiConfig';
+import { useAuth } from '@/context/AuthContext';
 import { SYSTEM_MODULES } from '@/lib/modulesConfig';
 import SearchableSelect from '@/components/SearchableSelect';
 export default function UserManagementPage() {
@@ -15,6 +16,9 @@ export default function UserManagementPage() {
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
+  const { user: signedInUser } = useAuth();
+  const isAdmin = signedInUser?.role_code === 'ADMIN';   // only an admin may change a login name
+
   const [editingUser, setEditingUser] = useState(null);
   const usernameInputRef = useRef(null);
 
@@ -187,7 +191,9 @@ export default function UserManagementPage() {
               if (parsed.user_code === editingUser.user_code) {
                 parsed.modules = selectedModules;
                 parsed.departments = selectedDepts;
-                sessionStorage.setItem('sdcp_user_session', JSON.stringify(parsed));
+                const refreshed = JSON.stringify(parsed);
+                sessionStorage.setItem('sdcp_user_session', refreshed);
+                try { localStorage.setItem('sdcp_user_session', refreshed); } catch (err) {}
               }
             }
           } catch (e) {}
@@ -389,15 +395,18 @@ export default function UserManagementPage() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--on-surface-variant)' }}>Username (Login ID)</label>
+                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--on-surface-variant)' }}>
+                    Username (Login ID){editingUser && isAdmin ? ' — admin can change it' : ''}
+                  </label>
                   <input
                     ref={usernameInputRef}
                     type="text"
                     required
-                    disabled={!!editingUser}
+                    disabled={!!editingUser && !isAdmin}
+                    title={editingUser && !isAdmin ? 'Only an administrator can change a login name' : ''}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--outline-variant)', fontSize: '13.5px' }}
+                    style={{ padding: '8px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--outline-variant)', fontSize: '13.5px', backgroundColor: (editingUser && !isAdmin) ? 'var(--surface-container-high)' : undefined }}
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

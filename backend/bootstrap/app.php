@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // Global CORS for all API routes
         $middleware->append(\App\Http\Middleware\CorsMiddleware::class);
+        // Records every create / update / delete API call in tbl_web_audit_logs
+        $middleware->append(\App\Http\Middleware\AuditLogMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

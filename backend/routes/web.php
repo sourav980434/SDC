@@ -193,6 +193,79 @@ function getCurrentUserName(\Illuminate\Http\Request $request = null) {
     return 'System';
 }
 
+/**
+ * Departments the signed-in user may work in (Lab Result Entry, sample tracking, approvals).
+ * Returns null when the user has access to everything: administrators, and calls without a user
+ * header (internal scripts). Cached for a minute so it costs one query per user, not per row.
+ */
+if (!function_exists('userDeptCodes')) {
+    function userDeptCodes(\Illuminate\Http\Request $request = null) {
+        $userCode = $request ? trim((string) $request->header('X-User-Code')) : '';
+        if ($userCode === '') {
+            return null;
+        }
+
+        return Cache::remember('user_dept_access_' . $userCode, 60, function () use ($userCode) {
+            $role = DB::table('tbl_web_users')->where('user_code', $userCode)->value('role_code');
+            if (strtoupper(trim((string) $role)) === 'ADMIN') {
+                return null;
+            }
+            $depts = DB::table('tbl_web_user_dept_access')->where('user_code', $userCode)->pluck('dept_code')
+                ->map(fn ($d) => strtoupper(trim((string) $d)))->filter()->values()->all();
+            return $depts;   // empty array = no department assigned = no lab access
+        });
+    }
+}
+
+/** True when the user may work on this booking detail line (its test's department). */
+if (!function_exists('canWorkOnDtl')) {
+    function canWorkOnDtl(\Illuminate\Http\Request $request, $dtlId) {
+        $allowed = userDeptCodes($request);
+        if ($allowed === null) {
+            return true;
+        }
+        if (!$allowed) {
+            return false;
+        }
+
+        $dept = DB::table('tbl_web_booking_dtl as d')
+            ->leftJoin('MTest as t', 'd.test_code', '=', 't.Code')
+            ->where('d.id', $dtlId)
+            ->selectRaw('COALESCE(RTRIM(t.DeptCode), RTRIM(d.dept_code)) as dept_code')
+            ->value('dept_code');
+
+        return in_array(strtoupper(trim((string) $dept)), $allowed, true);
+    }
+}
+
+/** True for users who approve reports (Report Approval module or admin) - they see reports before approval. */
+if (!function_exists('isReportApprover')) {
+    function isReportApprover(\Illuminate\Http\Request $request) {
+        $userCode = trim((string) $request->header('X-User-Code'));
+        if ($userCode === '') {
+            return true;   // internal call / no user context
+        }
+        return Cache::remember('is_report_approver_' . $userCode, 60, function () use ($userCode) {
+            $role = DB::table('tbl_web_users')->where('user_code', $userCode)->value('role_code');
+            if (strtoupper(trim((string) $role)) === 'ADMIN') {
+                return true;
+            }
+            return DB::table('tbl_web_user_module_access')
+                ->where('user_code', $userCode)->where('module_key', 'report_approval')->exists();
+        });
+    }
+}
+
+/** Standard refusal for a test that belongs to another department. */
+if (!function_exists('deptDeniedResponse')) {
+    function deptDeniedResponse() {
+        return response()->json([
+            'error' => 'This test belongs to a department you do not have access to. Please ask the administrator for that department.',
+            'code' => 'DEPARTMENT_NOT_ALLOWED',
+        ], 403);
+    }
+}
+
 // Preflight OPTIONS handled by CorsMiddleware (app/Http/Middleware/CorsMiddleware.php)
 
 // Search Doctors (for Booking dropdown)
@@ -1597,7 +1670,10 @@ Route::get('/api/booking/by-no/{serial}', function ($serial) {
         'paymentMethod' => trim($webHdr->payment_method ?? 'Cash'),
         'date' => $webHdr->booking_date ? (new DateTime($webHdr->booking_date))->format('Y-m-d H:i:s') : '',
         'created_at_formatted' => $webHdr->created_at ? (new DateTime($webHdr->created_at))->format('d-M-Y h:i A') : ($webHdr->booking_date ? (new DateTime($webHdr->booking_date))->format('d-M-Y h:i A') : ''),
-        'created_by_user' => 'Admin',
+        // Who actually created this booking (falls back to the stored code)
+        'created_by_user' => trim(DB::table('tbl_web_users')->where('user_code', $webHdr->created_by)->value('full_name')
+            ?: DB::table('tbl_web_users')->where('user_code', $webHdr->created_by)->value('username')
+            ?: ($webHdr->created_by ?? 'System')),
     ]);
 });
 
@@ -2201,6 +2277,17 @@ Route::get('/api/sample-tracking/queue', function (Request $request) {
         });
     }
 
+    // The user's own departments are applied server-side; the query parameter can only narrow further
+    $userDepts = userDeptCodes($request);
+    if ($userDepts !== null) {
+        if (!$userDepts) {
+            return response()->json([]);   // no department assigned - nothing to work on
+        }
+        $query->where(function($q) use ($userDepts) {
+            $q->whereIn('t.DeptCode', $userDepts)->orWhereIn('d.dept_code', $userDepts);
+        });
+    }
+
     if ($allowedDepts !== '') {
         $allowedList = array_map('trim', explode(',', $allowedDepts));
         $query->where(function($q) use ($allowedList) {
@@ -2225,7 +2312,22 @@ Route::get('/api/sample-tracking/queue', function (Request $request) {
         });
     }
 
-    $queue = $query->orderBy('d.id', 'desc')->take(100)->get()->map(function($item) {
+    $rows = $query->orderBy('d.id', 'desc')->take(100)->get();
+
+    // One extra query tells the worklist which lines already have files (PDF / doctor copy)
+    $files = [];
+    try {
+        $ids = $rows->pluck('id')->filter()->all();
+        if ($ids) {
+            foreach (DB::table('tbl_web_report_files')->whereIn('dtl_id', $ids)->get(['dtl_id', 'file_type']) as $file) {
+                $files[$file->dtl_id][$file->file_type ?? 'REPORT_PDF'] = true;
+            }
+        }
+    } catch (\Throwable $e) {
+        $files = [];   // table not created yet - no files to show
+    }
+
+    $queue = $rows->map(function($item) use ($files) {
         $dept = !empty($item->master_dept_name) ? trim($item->master_dept_name) : (!empty($item->dept_name) ? trim($item->dept_name) : 'UNKNOWN');
         $deptCodeVal = !empty($item->test_dept_code) ? trim($item->test_dept_code) : (!empty($item->dept_code) ? trim($item->dept_code) : '');
         return [
@@ -2243,6 +2345,11 @@ Route::get('/api/sample-tracking/queue', function (Request $request) {
             'testStatus' => $item->test_status ?? 'PENDING',
             'resultFlag' => $item->result_flag ?? 'NORMAL',
             'hasNarrative' => !empty($item->narrative_html ?? null),
+            'hasPdf' => !empty($files[$item->id]['REPORT_PDF']),
+            'hasDoctorCopy' => !empty($files[$item->id]['DOCTOR_COPY']),
+            'sentBackNote' => !empty($item->report_sent_back_at ?? null) ? trim($item->report_approval_note ?? '') : '',
+            'sentBackBy' => !empty($item->report_sent_back_at ?? null) ? trim($item->report_sent_back_by ?? '') : '',
+            'approvedAt' => !empty($item->report_approved_at ?? null) ? (new DateTime($item->report_approved_at))->format('d-M h:i A') : null,
             'bookingDate' => !empty($item->booking_date) ? (new DateTime($item->booking_date))->format('d-M-Y') : ''
         ];
     });
@@ -2284,6 +2391,9 @@ Route::post('/api/sample-tracking/save-parameter-results', function (Request $re
 
     if (!$dtlId) {
         return response()->json(['error' => 'Detail ID is required.'], 400);
+    }
+    if (!canWorkOnDtl($request, $dtlId)) {
+        return deptDeniedResponse();
     }
 
     $overallFlag = 'NORMAL';
@@ -2354,6 +2464,9 @@ Route::post('/api/sample-tracking/save-result', function (Request $request) {
     if (!$dtlId) {
         return response()->json(['error' => 'Detail ID is required.'], 400);
     }
+    if (!canWorkOnDtl($request, $dtlId)) {
+        return deptDeniedResponse();
+    }
 
     DB::table('tbl_web_booking_dtl')->where('id', $dtlId)->update([
         'result_json' => json_encode(['value' => $value]),
@@ -2385,7 +2498,12 @@ if (!function_exists('ensureNarrativeColumns')) {
 Route::get('/api/report-templates/status', function () {
     $dir = \App\Services\ReportTemplateService::dir();
     return response()->json([
+        // Reports open from the converted cache; a converter is only needed for templates
+        // that were never converted (new or edited ones).
+        'converter' => \App\Services\ReportTemplateService::converter(),      // best available, or null
+        'converters' => \App\Services\ReportTemplateService::converters(),     // word / libreoffice / phpword
         'word_installed' => \App\Services\ReportTemplateService::wordInstalled(),
+        'coverage' => \App\Services\ReportTemplateService::coverage(),
         'folder_exists' => is_dir($dir),
         'linked_tests' => count(\App\Services\ReportTemplateService::index()),
     ]);
@@ -2423,13 +2541,14 @@ Route::get('/api/report-templates/content', function (Request $request) {
     try {
         return response()->json(\App\Services\ReportTemplateService::content($file));
     } catch (\RuntimeException $e) {
-        if ($e->getMessage() === 'WORD_NOT_INSTALLED') {
+        if ($e->getMessage() === 'NO_CONVERTER') {
             return response()->json([
-                'error' => 'Microsoft Word is not installed on the server PC.',
-                'code' => 'WORD_NOT_INSTALLED',
+                'error' => 'This template has not been converted yet, and this server has neither Microsoft Word nor LibreOffice. '
+                    . 'Convert it on a PC that has Word (php artisan report-templates:warm) and deploy the REPORT_MASTER folder, or install LibreOffice on the server.',
+                'code' => 'NO_CONVERTER',
             ], 503);
         }
-        return response()->json(['error' => 'Could not open this template with Microsoft Word.', 'code' => 'CONVERSION_FAILED'], 500);
+        return response()->json(['error' => 'Could not convert this template.', 'code' => 'CONVERSION_FAILED'], 500);
     }
 });
 
@@ -2439,6 +2558,34 @@ Route::get('/api/report-templates/content', function (Request $request) {
 Route::get('/api/report-templates/overview', function () {
     return response()->json(array_map('count', \App\Services\ReportTemplateService::index()));
 });
+
+if (!function_exists('convertTemplateNow')) {
+    /**
+     * Converts a freshly uploaded / replaced template to HTML straight away, so writing a report
+     * with it later never waits for Word and never fails on a server without a converter.
+     */
+    function convertTemplateNow(string $file): array {
+        $service = \App\Services\ReportTemplateService::class;
+        try {
+            set_time_limit(180);
+            $failed = $service::convert([$file]);
+            if (!isset($failed[$file])) {
+                return ['ok' => true, 'code' => 'OK', 'message' => null];
+            }
+            $code = $failed[$file];
+            return [
+                'ok' => false,
+                'code' => $code,
+                'message' => $code === 'NO_CONVERTER'
+                    ? 'The file is saved, but this server has neither Microsoft Word nor LibreOffice, so it could not be prepared for the report editor yet.'
+                    : 'The file is saved, but it could not be converted for the report editor. Please check that it opens in Word.',
+            ];
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Template conversion after upload failed for $file: " . $e->getMessage());
+            return ['ok' => false, 'code' => 'CONVERSION_FAILED', 'message' => 'The file is saved, but it could not be converted for the report editor.'];
+        }
+    }
+}
 
 // Reporting doctors for the upload form (variant code = MDoctor code of the doctor the template belongs to)
 Route::get('/api/report-templates/doctors', function () {
@@ -2511,8 +2658,16 @@ Route::post('/api/report-templates/upload', function (Request $request) {
         return response()->json(['error' => $e->getMessage()], 500);
     }
 
-    logAuditLog(null, getCurrentUserName($request), 'REPORT_TEMPLATE', 'UPLOAD', "Template $file uploaded for test $testCode");
-    return response()->json(['message' => 'Template uploaded.', 'file' => $file, 'templates' => $service::withNames($service::forTest($testCode))]);
+    $converted = convertTemplateNow($file);
+
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'REPORT_TEMPLATE', 'UPLOAD', "Template $file uploaded for test $testCode" . ($converted['ok'] ? ' (converted)' : ' (NOT converted: ' . $converted['code'] . ')'));
+    return response()->json([
+        'message' => 'Template uploaded.',
+        'file' => $file,
+        'converted' => $converted['ok'],
+        'convert_error' => $converted['ok'] ? null : $converted['message'],
+        'templates' => $service::withNames($service::forTest($testCode)),
+    ]);
 });
 
 // Replace an existing template with an edited Word file - same name, doctor and default;
@@ -2535,8 +2690,16 @@ Route::post('/api/report-templates/replace', function (Request $request) {
         return response()->json(['error' => $e->getMessage()], 500);
     }
 
-    logAuditLog(null, getCurrentUserName($request), 'REPORT_TEMPLATE', 'REPLACE', "Template {$tpl['file']} replaced for test {$tpl['test_code']}" . ($file !== $tpl['file'] ? " (now $file)" : ''));
-    return response()->json(['message' => 'Template updated.', 'file' => $file, 'templates' => $service::withNames($service::forTest($tpl['test_code']))]);
+    $converted = convertTemplateNow($file);
+
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'REPORT_TEMPLATE', 'REPLACE', "Template {$tpl['file']} replaced for test {$tpl['test_code']}" . ($file !== $tpl['file'] ? " (now $file)" : '') . ($converted['ok'] ? ' (converted)' : ' (NOT converted: ' . $converted['code'] . ')'));
+    return response()->json([
+        'message' => 'Template updated.',
+        'file' => $file,
+        'converted' => $converted['ok'],
+        'convert_error' => $converted['ok'] ? null : $converted['message'],
+        'templates' => $service::withNames($service::forTest($tpl['test_code'])),
+    ]);
 });
 
 // Choose which template opens by default for its test
@@ -2547,7 +2710,7 @@ Route::post('/api/report-templates/set-default', function (Request $request) {
         return response()->json(['error' => 'Template not found.'], 404);
     }
     $service::setDefault($tpl['test_code'], $tpl['file']);
-    logAuditLog(null, getCurrentUserName($request), 'REPORT_TEMPLATE', 'SET_DEFAULT', "Default template for {$tpl['test_code']}: {$tpl['file']}");
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'REPORT_TEMPLATE', 'SET_DEFAULT', "Default template for {$tpl['test_code']}: {$tpl['file']}");
     return response()->json(['message' => 'Default template updated.', 'templates' => $service::withNames($service::forTest($tpl['test_code']))]);
 });
 
@@ -2563,7 +2726,7 @@ Route::post('/api/report-templates/delete', function (Request $request) {
     } catch (\RuntimeException $e) {
         return response()->json(['error' => $e->getMessage()], 500);
     }
-    logAuditLog(null, getCurrentUserName($request), 'REPORT_TEMPLATE', 'DELETE', "Template {$tpl['file']} removed from test {$tpl['test_code']}");
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'REPORT_TEMPLATE', 'DELETE', "Template {$tpl['file']} removed from test {$tpl['test_code']}");
     return response()->json(['message' => 'Template removed.', 'templates' => $service::withNames($service::forTest($tpl['test_code']))]);
 });
 
@@ -2588,8 +2751,39 @@ Route::post('/api/sample-tracking/save-narrative', function (Request $request) {
     if (trim(strip_tags($html)) === '') {
         return response()->json(['error' => 'Report is empty.'], 400);
     }
+    if (!canWorkOnDtl($request, $dtlId)) {
+        return deptDeniedResponse();
+    }
 
     ensureNarrativeColumns();
+    ensureApprovalColumns();
+
+    // Was this report sent back? Then this save is a correction the approver is waiting for.
+    $previous = DB::table('tbl_web_booking_dtl')->where('id', $dtlId)->first();
+    $wasSentBack = !empty($previous->report_sent_back_at ?? null);
+
+    // A saved report is locked: it can only be changed after the approver sends it back with a comment
+    if (!empty($previous->narrative_html ?? null) && !$wasSentBack) {
+        return response()->json([
+            'error' => !empty($previous->report_approved_at ?? null)
+                ? 'This report is already approved, so it cannot be changed. Ask the approver to send it back for correction.'
+                : 'This report is already saved and waiting for approval. It can be changed only after the approver sends it back with a comment.',
+            'code' => 'REPORT_LOCKED',
+        ], 423);
+    }
+
+    // The doctor's signed copy must be on file before a report can be saved
+    \App\Services\ReportPdfService::ensureSchema();
+    $hasDoctorCopy = DB::table('tbl_web_report_files')
+        ->where('dtl_id', $dtlId)
+        ->where('file_type', 'DOCTOR_COPY')
+        ->exists();
+    if (!$hasDoctorCopy) {
+        return response()->json([
+            'error' => 'Please upload the Doctor copy first, then save the report.',
+            'code' => 'DOCTOR_COPY_REQUIRED',
+        ], 422);
+    }
 
     $html = preg_replace('/<script\b.*?<\/script>/is', '', $html);
     $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
@@ -2607,15 +2801,520 @@ Route::post('/api/sample-tracking/save-narrative', function (Request $request) {
         return response()->json(['error' => 'Test line not found.'], 404);
     }
 
-    logAuditLog(null, getCurrentUserName($request), 'RESULT_ENTRY', 'SAVE_REPORT', "Template report saved for booking detail #$dtlId");
+    if ($wasSentBack) {
+        // The correction is done: clear the send-back marks (the comment stays for history) so the
+        // report is locked again while it waits for approval
+        DB::table('tbl_web_booking_dtl')->where('id', $dtlId)->update([
+            'report_resubmitted_at' => now(),
+            'report_resubmitted_by' => getCurrentUserName($request),
+            'report_sent_back_at' => null,
+            'report_sent_back_by' => null,
+        ]);
+    }
 
-    return response()->json(['message' => 'Report saved successfully.']);
+    // Every saved report waits for approval, so the administrators and approvers are told about it
+    $booking = DB::table('tbl_web_booking_hdr')->where('id', $previous->booking_id)->first();
+    $who = trim($previous->test_name ?? 'Report') . ' of ' . trim($booking->patient_name ?? '') . ' (' . trim($booking->booking_no ?? '') . ')';
+    \App\Services\NotificationService::send(\App\Services\NotificationService::approvers(), [
+        'type' => $wasSentBack ? 'REPORT_RESUBMITTED' : 'REPORT_READY',
+        'title' => $wasSentBack ? 'Corrected report ready for approval' : 'Report ready for approval',
+        'message' => $wasSentBack
+            ? $who . ' was corrected and saved again.'
+            : $who . ' was saved by ' . getCurrentUserName($request) . ' and is waiting for approval.',
+        'link' => '/lab/report-approval',
+        'ref_type' => 'BOOKING_DTL',
+        'ref_id' => $dtlId,
+        'created_by' => getCurrentUserCode($request),
+        'created_by_name' => getCurrentUserName($request),
+        'dedupe' => true,   // repeated saves do not repeat the notification
+    ]);
+
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'RESULT_ENTRY', 'SAVE_REPORT', "Template report saved for booking detail #$dtlId" . ($wasSentBack ? ' (correction after send back)' : ''));
+
+    // Keep a PDF copy against the patient and the bill (reprint / email / WhatsApp later)
+    $pdf = null;
+    $pdfError = null;
+    try {
+        set_time_limit(120);
+        $pdf = \App\Services\ReportPdfService::generate((int) $dtlId, getCurrentUserName($request));
+    } catch (\Throwable $e) {
+        $pdfError = $e->getMessage();
+        \Illuminate\Support\Facades\Log::warning('Report PDF failed for detail #' . $dtlId . ': ' . $e->getMessage());
+    }
+
+    return response()->json([
+        'message' => 'Report saved successfully.',
+        'pdf' => $pdf,              // { path, file, size } or null
+        'pdf_error' => $pdfError,   // report still saved even when the PDF could not be written
+    ]);
+});
+
+// Open / download the stored report PDF of one test line
+Route::get('/api/lab/report-pdf/{dtlId}', function (Request $request, $dtlId) {
+    ensureApprovalColumns();
+
+    $line = DB::table('tbl_web_booking_dtl')->where('id', $dtlId)->first();
+    if (!$line) {
+        return response()->json(['error' => 'Test line not found.'], 404);
+    }
+
+    // Until it is approved, only the people who approve reports may open it
+    if (empty($line->report_approved_at ?? null) && !isReportApprover($request)) {
+        return response()->json([
+            'error' => 'This report is not approved yet. Please wait for approval before printing or sharing the PDF.',
+            'code' => 'REPORT_NOT_APPROVED',
+        ], 403);
+    }
+
+    $path = \App\Services\ReportPdfService::fullPath($line->report_pdf_path ?? null);
+    if (!$path) {
+        // Not generated yet (or file missing) - build it now
+        try {
+            set_time_limit(120);
+            $pdf = \App\Services\ReportPdfService::generate((int) $dtlId, getCurrentUserName($request));
+            $path = \App\Services\ReportPdfService::fullPath($pdf['path']);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 404);
+        }
+    }
+
+    $name = trim($line->test_code ?? 'REPORT') . '_' . $line->id . '.pdf';
+    return response()->file($path, [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => ($request->query('download') ? 'attachment' : 'inline') . '; filename="' . $name . '"',
+    ]);
+});
+
+// ---- Notifications (bell in the top bar + the Notifications page) ----
+
+// My notifications. ?unread=1 for the bell, otherwise the full list with paging.
+Route::get('/api/notifications', function (Request $request) {
+    \App\Services\NotificationService::ensureSchema();
+
+    $userCode = trim((string) $request->header('X-User-Code'));
+    if ($userCode === '') {
+        return response()->json(['data' => [], 'unread' => 0, 'total' => 0, 'page' => 1, 'last_page' => 1]);
+    }
+
+    $query = DB::table('tbl_web_notifications')->where('user_code', $userCode);
+    if (filter_var($request->query('unread', false), FILTER_VALIDATE_BOOLEAN)) {
+        $query->whereNull('read_at');
+    }
+
+    $perPage = min(max((int) $request->query('per_page', 20), 1), 200);
+    $page = max((int) $request->query('page', 1), 1);
+    $total = (clone $query)->count();
+    $lastPage = max((int) ceil($total / $perPage), 1);
+
+    $rows = $query->orderBy('id', 'desc')->forPage(min($page, $lastPage), $perPage)->get();
+
+    return response()->json([
+        'data' => $rows->map(function ($n) {
+            return [
+                'id' => $n->id,
+                'type' => $n->type,
+                'title' => $n->title,
+                'message' => $n->message,
+                'link' => $n->link,
+                'ref_id' => $n->ref_id,
+                'from' => trim($n->created_by_name ?? ''),
+                'created_at' => $n->created_at ? (new DateTime($n->created_at))->format('d-M-Y h:i A') : '',
+                'is_read' => !empty($n->read_at),
+                'read_at' => $n->read_at ? (new DateTime($n->read_at))->format('d-M-Y h:i A') : null,
+            ];
+        }),
+        'unread' => DB::table('tbl_web_notifications')->where('user_code', $userCode)->whereNull('read_at')->count(),
+        'total' => $total,
+        'page' => min($page, $lastPage),
+        'per_page' => $perPage,
+        'last_page' => $lastPage,
+    ]);
+});
+
+// Mark one notification (id) or all of mine as read
+Route::post('/api/notifications/read', function (Request $request) {
+    \App\Services\NotificationService::ensureSchema();
+
+    $userCode = trim((string) $request->header('X-User-Code'));
+    if ($userCode === '') {
+        return response()->json(['error' => 'No user.'], 400);
+    }
+
+    $query = DB::table('tbl_web_notifications')->where('user_code', $userCode)->whereNull('read_at');
+    if ($id = $request->input('id')) {
+        $query->where('id', $id);
+    }
+    $marked = $query->update(['read_at' => now()]);
+
+    return response()->json([
+        'message' => 'Marked as read.',
+        'marked' => $marked,
+        'unread' => DB::table('tbl_web_notifications')->where('user_code', $userCode)->whereNull('read_at')->count(),
+    ]);
+});
+
+// ---- Report Approval (match the saved report against the doctor copy, then approve) ----
+
+if (!function_exists('ensureApprovalColumns')) {
+    function ensureApprovalColumns() {
+        Cache::rememberForever('dtl_approval_columns_ready', function () {
+            \Illuminate\Support\Facades\Schema::table('tbl_web_booking_dtl', function ($table) {
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tbl_web_booking_dtl', 'report_approved_at')) $table->dateTime('report_approved_at')->nullable();
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tbl_web_booking_dtl', 'report_approved_by')) $table->string('report_approved_by', 50)->nullable();
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tbl_web_booking_dtl', 'report_approval_note')) $table->string('report_approval_note', 500)->nullable();
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tbl_web_booking_dtl', 'report_sent_back_at')) $table->dateTime('report_sent_back_at')->nullable();
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tbl_web_booking_dtl', 'report_sent_back_by')) $table->string('report_sent_back_by', 50)->nullable();
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tbl_web_booking_dtl', 'report_resubmitted_at')) $table->dateTime('report_resubmitted_at')->nullable();
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('tbl_web_booking_dtl', 'report_resubmitted_by')) $table->string('report_resubmitted_by', 50)->nullable();
+            });
+            return true;
+        });
+    }
+}
+
+// Reports that are written and waiting to be matched with the doctor copy (or already approved)
+Route::get('/api/lab/approval-queue', function (Request $request) {
+    ensureApprovalColumns();
+    \App\Services\ReportPdfService::ensureSchema();
+
+    $status = strtolower(trim($request->query('status', 'pending')));   // pending | approved | all
+    $search = trim($request->query('search', ''));
+
+    $query = DB::table('tbl_web_booking_dtl as d')
+        ->join('tbl_web_booking_hdr as h', 'd.booking_id', '=', 'h.id')
+        ->leftJoin('MTest as t', 'd.test_code', '=', 't.Code')
+        ->leftJoin('MDepartment as md', 't.DeptCode', '=', 'md.Code')
+        ->whereNotNull('d.narrative_html')
+        ->select(
+            'd.id', 'd.booking_id', 'd.test_code', 'd.test_name', 'd.test_status', 'd.result_entered_at',
+            'd.result_entered_by', 'd.report_approved_at', 'd.report_approved_by', 'd.report_approval_note',
+            'd.report_sent_back_at', 'd.report_sent_back_by', 'd.report_resubmitted_at', 'd.report_resubmitted_by',
+            'h.booking_no', 'h.patient_name', 'h.patient_prefix', 'h.mobile_no', 'h.booking_date', 'h.doctor_name',
+            'h.age_year', 'h.sex', DB::raw('RTRIM(md.Descr) as dept_name')
+        );
+
+    $userDepts = userDeptCodes($request);
+    if ($userDepts !== null) {
+        if (!$userDepts) {
+            return response()->json([]);
+        }
+        $query->where(function ($q) use ($userDepts) {
+            $q->whereIn('t.DeptCode', $userDepts)->orWhereIn('d.dept_code', $userDepts);
+        });
+    }
+
+    if ($status === 'pending') {
+        $query->whereNull('d.report_approved_at');
+    } elseif ($status === 'approved') {
+        $query->whereNotNull('d.report_approved_at');
+    } elseif ($status === 'sent_back') {
+        $query->whereNull('d.report_approved_at')->whereNotNull('d.report_sent_back_at');
+    }
+
+    if ($search !== '') {
+        $query->where(function ($q) use ($search) {
+            $q->where('h.booking_no', 'like', "%$search%")
+              ->orWhere('h.patient_name', 'like', "%$search%")
+              ->orWhere('h.mobile_no', 'like', "%$search%")
+              ->orWhere('d.test_name', 'like', "%$search%");
+        });
+    }
+
+    $rows = $query->orderBy('d.id', 'desc')->take(150)->get();
+
+    $copies = [];
+    $ids = $rows->pluck('id')->all();
+    if ($ids) {
+        foreach (DB::table('tbl_web_report_files')->whereIn('dtl_id', $ids)->get(['dtl_id', 'file_type', 'file_name']) as $file) {
+            $copies[$file->dtl_id][$file->file_type ?? 'REPORT_PDF'] = $file->file_name;
+        }
+    }
+
+    return response()->json($rows->map(function ($r) use ($copies) {
+        return [
+            'id' => $r->id,
+            'bookingId' => $r->booking_id,
+            'bookingNo' => trim($r->booking_no ?? ''),
+            'patientName' => trim(($r->patient_prefix ? $r->patient_prefix . ' ' : '') . ($r->patient_name ?? '')),
+            'age' => trim((string) ($r->age_year ?? '')),
+            'sex' => trim($r->sex ?? ''),
+            'phone' => trim($r->mobile_no ?? ''),
+            'refDoctor' => trim($r->doctor_name ?? ''),
+            'bookingDate' => !empty($r->booking_date) ? (new DateTime($r->booking_date))->format('d-M-Y') : '',
+            'testCode' => trim($r->test_code ?? ''),
+            'testName' => trim($r->test_name ?? ''),
+            'deptName' => trim($r->dept_name ?? ''),
+            'enteredAt' => !empty($r->result_entered_at) ? (new DateTime($r->result_entered_at))->format('d-M h:i A') : null,
+            'enteredBy' => trim($r->result_entered_by ?? ''),
+            'approvedAt' => !empty($r->report_approved_at) ? (new DateTime($r->report_approved_at))->format('d-M-Y h:i A') : null,
+            'approvedBy' => trim($r->report_approved_by ?? ''),
+            'note' => trim($r->report_approval_note ?? ''),
+            'sentBackAt' => !empty($r->report_sent_back_at) ? (new DateTime($r->report_sent_back_at))->format('d-M-Y h:i A') : null,
+            'sentBackBy' => trim($r->report_sent_back_by ?? ''),
+            'resubmittedAt' => !empty($r->report_resubmitted_at) ? (new DateTime($r->report_resubmitted_at))->format('d-M-Y h:i A') : null,
+            'resubmittedBy' => trim($r->report_resubmitted_by ?? ''),
+            'hasDoctorCopy' => !empty($copies[$r->id]['DOCTOR_COPY']),
+            'doctorCopyName' => $copies[$r->id]['DOCTOR_COPY'] ?? null,
+            'hasPdf' => !empty($copies[$r->id]['REPORT_PDF']),
+        ];
+    }));
+});
+
+// One report for the full-screen review tab
+Route::get('/api/lab/approval-item/{dtlId}', function ($dtlId) {
+    ensureApprovalColumns();
+    \App\Services\ReportPdfService::ensureSchema();
+
+    $r = DB::table('tbl_web_booking_dtl as d')
+        ->join('tbl_web_booking_hdr as h', 'd.booking_id', '=', 'h.id')
+        ->leftJoin('MTest as t', 'd.test_code', '=', 't.Code')
+        ->leftJoin('MDepartment as md', 't.DeptCode', '=', 'md.Code')
+        ->where('d.id', $dtlId)
+        ->select(
+            'd.id', 'd.booking_id', 'd.test_code', 'd.test_name', 'd.test_status', 'd.result_entered_at',
+            'd.result_entered_by', 'd.report_approved_at', 'd.report_approved_by', 'd.report_approval_note',
+            'd.report_sent_back_at', 'd.report_sent_back_by', 'd.report_resubmitted_at', 'd.report_resubmitted_by', 'd.narrative_html',
+            'h.booking_no', 'h.patient_name', 'h.patient_prefix', 'h.mobile_no', 'h.booking_date', 'h.doctor_name',
+            'h.age_year', 'h.sex', DB::raw('RTRIM(md.Descr) as dept_name')
+        )
+        ->first();
+
+    if (!$r) {
+        return response()->json(['error' => 'Report not found.'], 404);
+    }
+
+    $copy = DB::table('tbl_web_report_files')->where('dtl_id', $r->id)->where('file_type', 'DOCTOR_COPY')->first();
+
+    return response()->json([
+        'id' => $r->id,
+        'bookingId' => $r->booking_id,
+        'bookingNo' => trim($r->booking_no ?? ''),
+        'patientName' => trim(($r->patient_prefix ? $r->patient_prefix . ' ' : '') . ($r->patient_name ?? '')),
+        'age' => trim((string) ($r->age_year ?? '')),
+        'sex' => trim($r->sex ?? ''),
+        'phone' => trim($r->mobile_no ?? ''),
+        'refDoctor' => trim($r->doctor_name ?? ''),
+        'bookingDate' => !empty($r->booking_date) ? (new DateTime($r->booking_date))->format('d-M-Y') : '',
+        'testCode' => trim($r->test_code ?? ''),
+        'testName' => trim($r->test_name ?? ''),
+        'deptName' => trim($r->dept_name ?? ''),
+        'hasReport' => !empty($r->narrative_html),
+        'enteredAt' => !empty($r->result_entered_at) ? (new DateTime($r->result_entered_at))->format('d-M-Y h:i A') : null,
+        'enteredBy' => trim($r->result_entered_by ?? ''),
+        'approvedAt' => !empty($r->report_approved_at) ? (new DateTime($r->report_approved_at))->format('d-M-Y h:i A') : null,
+        'approvedBy' => trim($r->report_approved_by ?? ''),
+        'note' => trim($r->report_approval_note ?? ''),
+        'sentBackAt' => !empty($r->report_sent_back_at) ? (new DateTime($r->report_sent_back_at))->format('d-M-Y h:i A') : null,
+        'sentBackBy' => trim($r->report_sent_back_by ?? ''),
+        'resubmittedAt' => !empty($r->report_resubmitted_at) ? (new DateTime($r->report_resubmitted_at))->format('d-M-Y h:i A') : null,
+        'resubmittedBy' => trim($r->report_resubmitted_by ?? ''),
+        'hasDoctorCopy' => (bool) $copy,
+        'doctorCopyName' => $copy->file_name ?? null,
+    ]);
+});
+
+// Approve a report after matching it with the doctor copy (or send it back for correction)
+Route::post('/api/lab/approve-report', function (Request $request) {
+    ensureApprovalColumns();
+    \App\Services\ReportPdfService::ensureSchema();
+
+    $dtlId = (int) $request->input('id');
+    $approve = filter_var($request->input('approve', true), FILTER_VALIDATE_BOOLEAN);
+    $note = mb_substr(trim((string) $request->input('note', '')), 0, 500);
+    $user = getCurrentUserName($request);
+
+    $line = DB::table('tbl_web_booking_dtl')->where('id', $dtlId)->first();
+    if (!$line) {
+        return response()->json(['error' => 'Test line not found.'], 404);
+    }
+    if (!canWorkOnDtl($request, $dtlId)) {
+        return deptDeniedResponse();
+    }
+    if (empty($line->narrative_html)) {
+        return response()->json(['error' => 'This test has no saved report yet.'], 422);
+    }
+
+    if ($approve) {
+        $hasCopy = DB::table('tbl_web_report_files')->where('dtl_id', $dtlId)->where('file_type', 'DOCTOR_COPY')->exists();
+        if (!$hasCopy) {
+            return response()->json([
+                'error' => 'The doctor copy is missing for this test, so it cannot be approved.',
+                'code' => 'DOCTOR_COPY_REQUIRED',
+            ], 422);
+        }
+
+        DB::table('tbl_web_booking_dtl')->where('id', $dtlId)->update([
+            'report_approved_at' => now(),
+            'report_approved_by' => $user,
+            'report_approval_note' => $note ?: null,
+            'report_sent_back_at' => null,
+            'report_sent_back_by' => null,
+            'test_status' => 'VERIFIED',
+            'verified_at' => now(),
+            'verified_by' => $user,
+        ]);
+        logAuditLog(getCurrentUserCode($request), $user, 'REPORT_APPROVAL', 'APPROVE', "Report approved for booking detail #$dtlId" . ($note ? " ($note)" : ''));
+
+        $writer = \App\Services\NotificationService::codeForName($line->result_entered_by ?? null);
+        $booking = DB::table('tbl_web_booking_hdr')->where('id', $line->booking_id)->first();
+        \App\Services\NotificationService::send($writer ? [$writer] : [], [
+            'type' => 'REPORT_APPROVED',
+            'title' => 'Report approved',
+            'message' => trim($line->test_name ?? 'Report') . ' of ' . trim($booking->patient_name ?? '') . ' (' . trim($booking->booking_no ?? '') . ') is approved.' . ($note ? ' Note: ' . $note : ''),
+            'link' => '/lab/result-entry',
+            'ref_type' => 'BOOKING_DTL',
+            'ref_id' => $dtlId,
+            'created_by' => getCurrentUserCode($request),
+            'created_by_name' => $user,
+        ]);
+
+        return response()->json(['message' => 'Report approved.']);
+    }
+
+    if ($note === '') {
+        return response()->json(['error' => 'Please write what has to be corrected before sending the report back.'], 422);
+    }
+
+    DB::table('tbl_web_booking_dtl')->where('id', $dtlId)->update([
+        'report_approved_at' => null,
+        'report_approved_by' => null,
+        'report_approval_note' => $note,
+        'report_sent_back_at' => now(),
+        'report_sent_back_by' => $user,
+        'test_status' => 'RESULT_ENTERED',
+        'verified_at' => null,
+        'verified_by' => null,
+    ]);
+    logAuditLog(getCurrentUserCode($request), $user, 'REPORT_APPROVAL', 'SEND_BACK', "Report sent back for booking detail #$dtlId" . ($note ? " ($note)" : ''));
+
+    // The person who wrote the report has to correct it
+    $writer = \App\Services\NotificationService::codeForName($line->result_entered_by ?? null);
+    $booking = DB::table('tbl_web_booking_hdr')->where('id', $line->booking_id)->first();
+    \App\Services\NotificationService::send($writer ? [$writer] : [], [
+        'type' => 'REPORT_SENT_BACK',
+        'title' => 'Report sent back for correction',
+        'message' => trim($line->test_name ?? 'Report') . ' of ' . trim($booking->patient_name ?? '') . ' (' . trim($booking->booking_no ?? '') . '): ' . $note,
+        'link' => '/lab/result-entry',
+        'ref_type' => 'BOOKING_DTL',
+        'ref_id' => $dtlId,
+        'created_by' => getCurrentUserCode($request),
+        'created_by_name' => $user,
+    ]);
+
+    return response()->json(['message' => 'Report sent back for correction.']);
+});
+
+// Upload the doctor's signed copy for a test line (image -> WebP, at least 25% smaller; PDF max 3 MB)
+Route::post('/api/lab/doctor-copy', function (Request $request) {
+    $dtlId = (int) $request->input('id');
+    $upload = $request->file('file');
+
+    if (!$dtlId) {
+        return response()->json(['error' => 'Test line is required.'], 400);
+    }
+    if (!$upload || !$upload->isValid()) {
+        $tooBig = ($upload && in_array($upload->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true))
+            || (!$upload && (int) $request->server('CONTENT_LENGTH') > 0);
+        if ($tooBig) {
+            return response()->json(['error' => 'File is larger than the server upload limit (upload_max_filesize = ' . ini_get('upload_max_filesize') . ').'], 413);
+        }
+        return response()->json(['error' => 'Please choose a file to upload.'], 400);
+    }
+
+    if (!canWorkOnDtl($request, $dtlId)) {
+        return deptDeniedResponse();
+    }
+
+    $ext = strtolower($upload->getClientOriginalExtension());
+    $allowed = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'heic', 'tif', 'tiff'];
+    if (!in_array($ext, $allowed, true)) {
+        return response()->json(['error' => 'Only an image (JPG, PNG, WebP...) or a PDF can be uploaded.'], 400);
+    }
+
+    try {
+        set_time_limit(120);
+        $saved = \App\Services\ReportPdfService::storeDoctorCopy(
+            $dtlId,
+            $upload->getRealPath(),
+            $ext,
+            $upload->getClientOriginalName(),
+            getCurrentUserName($request)
+        );
+    } catch (\RuntimeException $e) {
+        return response()->json(['error' => $e->getMessage()], 422);
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::warning('Doctor copy upload failed for #' . $dtlId . ': ' . $e->getMessage());
+        return response()->json(['error' => 'Could not save the file.'], 500);
+    }
+
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'RESULT_ENTRY', 'DOCTOR_COPY', "Doctor copy uploaded for booking detail #$dtlId ({$saved['file']})");
+    return response()->json(['message' => 'Doctor copy uploaded.'] + $saved);
+});
+
+// Open the doctor copy of a test line
+Route::get('/api/lab/doctor-copy/{dtlId}', function (Request $request, $dtlId) {
+    \App\Services\ReportPdfService::ensureSchema();
+
+    $row = DB::table('tbl_web_report_files')->where('dtl_id', $dtlId)->where('file_type', 'DOCTOR_COPY')->first();
+    $path = $row ? \App\Services\ReportPdfService::fullPath($row->file_path) : null;
+    if (!$path) {
+        return response()->json(['error' => 'No doctor copy uploaded for this test.'], 404);
+    }
+
+    return response()->file($path, [
+        'Content-Type' => str_ends_with(strtolower($row->file_name), '.pdf') ? 'application/pdf' : 'image/webp',
+        'Content-Disposition' => ($request->query('download') ? 'attachment' : 'inline') . '; filename="' . $row->file_name . '"',
+    ]);
+});
+
+// Report PDFs of a booking or a patient - the list a WhatsApp / email sender will use
+Route::get('/api/lab/report-files', function (Request $request) {
+    \App\Services\ReportPdfService::ensureSchema();
+
+    $query = DB::table('tbl_web_report_files');
+    if ($bookingNo = trim($request->query('booking_no', ''))) {
+        $query->where('booking_no', $bookingNo);
+    }
+    if ($bookingId = trim($request->query('booking_id', ''))) {
+        $query->orWhere('booking_id', $bookingId);
+    }
+    if ($patient = trim($request->query('patient_code', ''))) {
+        $query->where('patient_code', $patient);
+    }
+    if ($mobile = trim($request->query('mobile_no', ''))) {
+        $query->where('mobile_no', $mobile);
+    }
+
+    $files = $query->orderBy('created_at', 'desc')->limit(200)->get()->map(function ($row) {
+        return [
+            'id' => $row->id,
+            'dtl_id' => $row->dtl_id,
+            'booking_no' => trim($row->booking_no ?? ''),
+            'patient_code' => trim($row->patient_code ?? ''),
+            'patient_name' => trim($row->patient_name ?? ''),
+            'mobile_no' => trim($row->mobile_no ?? ''),
+            'test_code' => trim($row->test_code ?? ''),
+            'test_name' => trim($row->test_name ?? ''),
+            'file_type' => $row->file_type ?? 'REPORT_PDF',
+            'file_name' => $row->file_name,
+            'original_name' => $row->original_name ?? null,
+            'file_size_kb' => (int) ceil(($row->file_size ?? 0) / 1024),
+            'created_at' => $row->created_at,
+            'url' => url((($row->file_type ?? 'REPORT_PDF') === 'DOCTOR_COPY' ? '/api/lab/doctor-copy/' : '/api/lab/report-pdf/') . $row->dtl_id),
+            'exists' => (bool) \App\Services\ReportPdfService::fullPath($row->file_path),
+        ];
+    });
+
+    return response()->json($files);
 });
 
 Route::post('/api/sample-tracking/verify', function (Request $request) {
     $dtlId = $request->input('id');
     if (!$dtlId) {
         return response()->json(['error' => 'Detail ID is required.'], 400);
+    }
+    if (!canWorkOnDtl($request, $dtlId)) {
+        return deptDeniedResponse();
     }
 
     DB::table('tbl_web_booking_dtl')->where('id', $dtlId)->update([
@@ -2630,6 +3329,7 @@ Route::post('/api/sample-tracking/verify', function (Request $request) {
 // Helper function for System Audit Trail Logging
 if (!function_exists('logAuditLog')) {
     function logAuditLog($userCode, $username, $moduleName, $actionType, $description, $ip = '127.0.0.1') {
+        $GLOBALS['audit_logged'] = true;   // AuditLogMiddleware then skips its generic line
         try {
             DB::table('tbl_web_audit_logs')->insert([
                 'user_code' => $userCode ?? 'SYSTEM',
@@ -2825,7 +3525,7 @@ Route::post('/api/setup/users', function (Request $request) {
         }
     });
 
-    logAuditLog('ADMIN', 'ADMIN', 'USER_SETUP', 'USER_CREATED', 'Created new user account: ' . $data['username'] . ' (' . $userCode . ')', $request->ip());
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'USER_SETUP', 'USER_CREATED', 'Created new user account: ' . $data['username'] . ' (' . $userCode . ')', $request->ip());
 
     return response()->json(['message' => 'User created successfully', 'user_code' => $userCode]);
 });
@@ -2838,6 +3538,7 @@ Route::post('/api/setup/users/update/{id}', function (Request $request, $id) {
     }
 
     $data = $request->validate([
+        'username' => 'nullable|string',
         'full_name' => 'required|string',
         'role_code' => 'required|string',
         'password' => 'nullable|string',
@@ -2849,7 +3550,22 @@ Route::post('/api/setup/users/update/{id}', function (Request $request, $id) {
         'modules' => 'nullable|array'
     ]);
 
-    DB::transaction(function () use ($user, $data, $id) {
+    // Only an administrator may change a login name, and only to one nobody else uses
+    $newUsername = trim((string) ($data['username'] ?? ''));
+    if ($newUsername !== '' && strcasecmp($newUsername, trim($user->username)) !== 0) {
+        $requesterRole = DB::table('tbl_web_users')->where('user_code', getCurrentUserCode($request))->value('role_code');
+        if (strtoupper(trim((string) $requesterRole)) !== 'ADMIN') {
+            return response()->json([
+                'error' => 'Only an administrator can change a login name.',
+                'code' => 'ADMIN_ONLY',
+            ], 403);
+        }
+        if (DB::table('tbl_web_users')->where('username', $newUsername)->where('id', '!=', $id)->exists()) {
+            return response()->json(['error' => 'That username is already taken.'], 400);
+        }
+    }
+
+    DB::transaction(function () use ($user, $data, $id, $newUsername) {
         $updateData = [
             'full_name' => trim($data['full_name']),
             'role_code' => $data['role_code'],
@@ -2857,6 +3573,7 @@ Route::post('/api/setup/users/update/{id}', function (Request $request, $id) {
             'email' => $data['email'] ?? '',
             'discount_limit_percent' => floatval($data['discount_limit_percent'] ?? 10),
             'status' => $data['status'] ?? 'ACTIVE',
+            'username' => $newUsername !== '' ? $newUsername : trim($user->username),
             'updated_at' => now(),
         ];
 
@@ -2867,6 +3584,7 @@ Route::post('/api/setup/users/update/{id}', function (Request $request, $id) {
         DB::table('tbl_web_users')->where('id', $id)->update($updateData);
 
         // Sync department access
+        Cache::forget('user_dept_access_' . $user->user_code);
         DB::table('tbl_web_user_dept_access')->where('user_code', $user->user_code)->delete();
         if (!empty($data['departments'])) {
             foreach ($data['departments'] as $deptCode) {
@@ -2894,26 +3612,119 @@ Route::post('/api/setup/users/update/{id}', function (Request $request, $id) {
         }
     });
 
-    logAuditLog('ADMIN', 'ADMIN', 'USER_SETUP', 'USER_UPDATED', 'Updated access permissions for user: ' . $user->username . ' (' . $user->user_code . ')', $request->ip());
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'USER_SETUP', 'USER_UPDATED', 'Updated access permissions for user: ' . $user->username . ' (' . $user->user_code . ')', $request->ip());
 
     return response()->json(['message' => 'User updated successfully']);
 });
 
 // 5. Get Audit Logs
+if (!function_exists('auditLogQuery')) {
+    /** Audit log query with the page filters applied (used by the list and the export). */
+    function auditLogQuery(Request $request) {
+        $search = trim($request->input('search', ''));
+        $user = trim($request->input('user', ''));
+        $module = trim($request->input('module', ''));
+        $action = trim($request->input('action', ''));
+        $fromDate = trim($request->input('from_date', ''));
+        $toDate = trim($request->input('to_date', ''));
+
+        $query = DB::table('tbl_web_audit_logs');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('username', 'LIKE', "%{$search}%")
+                  ->orWhere('user_code', 'LIKE', "%{$search}%")
+                  ->orWhere('module_name', 'LIKE', "%{$search}%")
+                  ->orWhere('action_type', 'LIKE', "%{$search}%")
+                  ->orWhere('description', 'LIKE', "%{$search}%");
+            });
+        }
+        if ($user !== '') {
+            $query->where(function ($q) use ($user) {
+                $q->where('user_code', $user)->orWhere('username', $user);
+            });
+        }
+        if ($module !== '' && $module !== 'All') $query->where('module_name', $module);
+        if ($action !== '' && $action !== 'All') $query->where('action_type', $action);
+        if ($fromDate !== '') $query->where('created_at', '>=', $fromDate . ' 00:00:00');
+        if ($toDate !== '') $query->where('created_at', '<=', $toDate . ' 23:59:59');
+
+        return $query->orderBy('id', 'desc');
+    }
+}
+
+// Audit trail as a spreadsheet (CSV with BOM - opens directly in Excel), same filters as the page
+Route::get('/api/setup/audit-logs/export', function (Request $request) {
+    $rows = auditLogQuery($request)->take(20000)->get();
+    $fileName = 'audit-trail-' . now()->format('Y-m-d_His') . '.csv';
+
+    return response()->streamDownload(function () use ($rows) {
+        $out = fopen('php://output', 'w');
+        fwrite($out, "\xEF\xBB\xBF");   // BOM so Excel reads UTF-8 correctly
+        fputcsv($out, ['Date & Time', 'User Code', 'User Name', 'Module', 'Action', 'Description', 'IP Address']);
+        foreach ($rows as $r) {
+            fputcsv($out, [
+                $r->created_at ? (new DateTime($r->created_at))->format('d-M-Y h:i:s A') : '',
+                trim($r->user_code ?? ''),
+                trim($r->username ?? ''),
+                trim($r->module_name ?? ''),
+                trim($r->action_type ?? ''),
+                trim($r->description ?? ''),
+                trim($r->ip_address ?? ''),
+            ]);
+        }
+        fclose($out);
+    }, $fileName, [
+        'Content-Type' => 'text/csv; charset=UTF-8',
+        'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+    ]);
+});
+
 Route::get('/api/setup/audit-logs', function (Request $request) {
     $search = trim($request->input('search', ''));
+    $user = trim($request->input('user', ''));          // user code or username
+    $module = trim($request->input('module', ''));
+    $action = trim($request->input('action', ''));
+    $fromDate = trim($request->input('from_date', ''));
+    $toDate = trim($request->input('to_date', ''));
+    $limit = min(max((int) $request->input('limit', 200), 1), 1000);
+
     $query = DB::table('tbl_web_audit_logs');
 
     if (!empty($search)) {
         $query->where(function ($q) use ($search) {
             $q->where('username', 'LIKE', "%{$search}%")
+              ->orWhere('user_code', 'LIKE', "%{$search}%")
               ->orWhere('module_name', 'LIKE', "%{$search}%")
               ->orWhere('action_type', 'LIKE', "%{$search}%")
               ->orWhere('description', 'LIKE', "%{$search}%");
         });
     }
+    if ($user !== '') {
+        $query->where(function ($q) use ($user) {
+            $q->where('user_code', $user)->orWhere('username', $user);
+        });
+    }
+    if ($module !== '' && $module !== 'All') {
+        $query->where('module_name', $module);
+    }
+    if ($action !== '' && $action !== 'All') {
+        $query->where('action_type', $action);
+    }
+    if ($fromDate !== '') {
+        $query->where('created_at', '>=', $fromDate . ' 00:00:00');
+    }
+    if ($toDate !== '') {
+        $query->where('created_at', '<=', $toDate . ' 23:59:59');
+    }
 
-    $logs = $query->orderBy('id', 'desc')->take(100)->get();
+    $perPage = min(max((int) $request->input('per_page', 50), 5), 500);
+    $page = max((int) $request->input('page', 1), 1);
+    $total = (clone $query)->count();
+    $lastPage = max((int) ceil($total / $perPage), 1);
+    $page = min($page, $lastPage);
+
+    $logs = $query->orderBy('id', 'desc')->forPage($page, $perPage)->get();
 
     $formatted = $logs->map(function ($l) {
         return [
@@ -2928,7 +3739,25 @@ Route::get('/api/setup/audit-logs', function (Request $request) {
         ];
     });
 
-    return response()->json($formatted);
+    return response()->json([
+        'data' => $formatted,
+        'total' => $total,
+        'page' => $page,
+        'per_page' => $perPage,
+        'last_page' => $lastPage,
+        'from' => $total ? (($page - 1) * $perPage) + 1 : 0,
+        'to' => min($page * $perPage, $total),
+    ]);
+});
+
+// 5.1 Values to fill the audit trail filters
+Route::get('/api/setup/audit-filters', function () {
+    return response()->json([
+        'users' => DB::table('tbl_web_audit_logs')->select('user_code', 'username')->distinct()->orderBy('username')->get()
+            ->map(fn ($u) => ['code' => trim($u->user_code ?? ''), 'name' => trim($u->username ?? '')])->values(),
+        'modules' => DB::table('tbl_web_audit_logs')->distinct()->orderBy('module_name')->pluck('module_name')->filter()->values(),
+        'actions' => DB::table('tbl_web_audit_logs')->distinct()->orderBy('action_type')->pluck('action_type')->filter()->values(),
+    ]);
 });
 
 // 5. Get Permission Matrix (Casting integer booleans for clean JSON)
@@ -2972,7 +3801,7 @@ Route::post('/api/setup/permissions', function (Request $request) {
         }
     });
 
-    logAuditLog($request, 'PERMISSIONS_UPDATE', 'Updated global Role Permission Matrix grid permissions');
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'SETUP_PERMISSIONS', 'PERMISSIONS_UPDATE', 'Updated the Role Permission Matrix', $request->ip());
 
     return response()->json(['message' => 'Permission matrix updated successfully']);
 });
@@ -3009,7 +3838,14 @@ Route::get('/api/lab/patient-full-report/{bookingId}', function ($bookingId) {
             'test_status' => trim($item->test_status ?? 'PENDING'),
             'result_json' => $resultJson,
             'narrative_html' => $item->narrative_html ?? null,
+            'is_approved' => !empty($item->report_approved_at ?? null),
             'report_template_file' => $item->report_template_file ?? null,
+            'report_pdf_path' => $item->report_pdf_path ?? null,
+            'has_doctor_copy' => DB::table('tbl_web_report_files')->where('dtl_id', $item->id)->where('file_type', 'DOCTOR_COPY')->exists(),
+            'sent_back_note' => !empty($item->report_sent_back_at ?? null) ? trim($item->report_approval_note ?? '') : null,
+            'sent_back_by' => !empty($item->report_sent_back_at ?? null) ? trim($item->report_sent_back_by ?? '') : null,
+            'sent_back_at' => !empty($item->report_sent_back_at ?? null) ? (new DateTime($item->report_sent_back_at))->format('d-M-Y h:i A') : null,
+            'approved_at' => !empty($item->report_approved_at ?? null) ? (new DateTime($item->report_approved_at))->format('d-M-Y h:i A') : null,
             'result_entered_at' => $item->result_entered_at,
             'verified_at' => $item->verified_at
         ];
@@ -3030,6 +3866,52 @@ Route::get('/api/lab/patient-full-report/{bookingId}', function ($bookingId) {
         ],
         'test_items' => $testItems
     ]);
+});
+
+// ---- Letterhead (full A4 image every report is printed on) ----
+
+// The stored letterhead image, or 404 when none is uploaded
+Route::get('/api/setup/letterhead', function () {
+    $path = \App\Services\LetterheadService::letterheadPath();
+    if (!$path) {
+        return response()->json(['error' => 'No letterhead uploaded.'], 404);
+    }
+    return response()->file($path, ['Cache-Control' => 'no-cache, must-revalidate']);
+});
+
+// Upload / replace it (A4 image: JPG, PNG or WebP)
+Route::post('/api/setup/letterhead', function (Request $request) {
+    $upload = $request->file('file');
+    if (!$upload || !$upload->isValid()) {
+        $tooBig = ($upload && in_array($upload->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true))
+            || (!$upload && (int) $request->server('CONTENT_LENGTH') > 0);
+        return response()->json([
+            'error' => $tooBig
+                ? 'File is larger than the server upload limit (' . ini_get('upload_max_filesize') . ').'
+                : 'Please choose the letterhead image.',
+        ], $tooBig ? 413 : 400);
+    }
+
+    $ext = strtolower($upload->getClientOriginalExtension());
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'], true)) {
+        return response()->json(['error' => 'The letterhead must be an image (JPG, PNG, WebP, GIF or BMP).'], 400);
+    }
+
+    try {
+        $saved = \App\Services\LetterheadService::storeLetterhead($upload->getRealPath(), $ext);
+    } catch (\RuntimeException $e) {
+        return response()->json(['error' => $e->getMessage()], 422);
+    }
+
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'SETUP_SETTINGS', 'LETTERHEAD_UPLOAD', 'Uploaded the report letterhead (' . $saved['width'] . 'x' . $saved['height'] . ')', $request->ip());
+    return response()->json(['message' => 'Letterhead uploaded.'] + $saved);
+});
+
+// Remove it - reports then print with the plain header again
+Route::post('/api/setup/letterhead/remove', function (Request $request) {
+    \App\Services\LetterheadService::removeLetterhead();
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'SETUP_SETTINGS', 'LETTERHEAD_REMOVE', 'Removed the report letterhead', $request->ip());
+    return response()->json(['message' => 'Letterhead removed.']);
 });
 
 // Get Lab Settings
@@ -3077,7 +3959,7 @@ Route::post('/api/setup/settings', function (Request $request) {
         }
     });
 
-    logAuditLog($request, 'SETTINGS_UPDATE', 'Updated global Lab Identity & System Settings');
+    logAuditLog(getCurrentUserCode($request), getCurrentUserName($request), 'SETUP_SETTINGS', 'SETTINGS_UPDATE', 'Updated Lab Identity & System Settings', $request->ip());
 
     return response()->json(['message' => 'Lab settings updated successfully']);
 });

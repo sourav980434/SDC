@@ -17,7 +17,9 @@ export const SYSTEM_MODULES = [
   { key: 'result_entry', name: 'Lab Result Entry' },
   { key: 'pending_tests', name: 'Pending Test Register' },
   { key: 'verification', name: 'Lab Result Verification' },
+  { key: 'report_approval', name: 'Report Approval (Doctor Copy Match)' },
   { key: 'masters', name: 'Master Setup' },
+  { key: 'report_templates', name: 'Report Template Master' },
   { key: 'reports', name: 'Reports & Analytics' },
   { key: 'setup', name: 'User & Permission Setup' }
 ];

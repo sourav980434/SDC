@@ -38,3 +38,6 @@ REPORT MASTER/
 # Laravel generated runtime files
 backend/storage/framework/cache/
 backend/storage/framework/views/
+
+# Claude Code agent definitions (local only)
+.claude/

@@ -223,3 +223,71 @@
   background: var(--surface-container-high);
   border-top: 1px solid var(--outline-variant);
 }
+
+.requiredNote {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sentBackBar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #fff7ed;
+  border-bottom: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lockedBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Word pins letterhead rules with position + z-index; reports saved before that was
+   cleaned up would draw them across the text */
+.editor :global([style*="z-index"]) {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+}
+
+/* Word's letterhead rule: a hair-thin, over-wide image. Reports saved before it was converted
+   into a plain rule keep the image, so it is kept inside the page here. */
+.editor :global(img[height="1"]),
+.editor :global(img[height="2"]),
+.editor :global(img[height="3"]),
+.editor :global(img[height="4"]) {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 1px !important;
+  margin: 8px auto !important;
+}
+
+.editor :global(img),
+.editor :global(table) {
+  max-width: 100%;
+}
+
+.editor :global(hr) {
+  border: none;
+  border-top: 1px solid #000;
+  width: 100%;
+  margin: 8px 0;
+}

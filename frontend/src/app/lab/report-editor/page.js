@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Printer, FileText, RefreshCw, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, Save, Printer, FileText, RefreshCw, TriangleAlert, FileDown, Upload, Paperclip } from 'lucide-react';
 import styles from './editor.module.css';
 
 import API_BASE from '@/lib/apiConfig';
@@ -14,10 +14,24 @@ import { useAuth } from '@/context/AuthContext';
 const BLANK_TEXT = '0.00';
 const FONT_SIZES = ['8', '9', '10', '11', '12', '14', '16', '18', '20', '24'];
 
-const WORD_MISSING_ALERT = {
+// Templates are converted once and the converted copy ships with the REPORT_MASTER folder, so
+// reports open on any server. Only a template that was never converted needs Word / LibreOffice.
+const LOCKED_ALERT = {
+  type: 'info',
+  title: 'Report locked',
+  message: 'This report is saved and waiting for approval. It can be changed only after the approver sends it back with a comment.',
+};
+
+const WAITING_APPROVAL_ALERT = {
+  type: 'warning',
+  title: 'Waiting for approval',
+  message: 'This report is not approved yet. The PDF and printing open once it is checked against the doctor copy and approved in Report Approval.',
+};
+
+const NO_CONVERTER_ALERT = {
   type: 'error',
-  title: 'Microsoft Word Required',
-  message: 'Microsoft Word is mandatory for generating reports from templates, but it is not installed on the server PC. Please install Microsoft Word on the server PC and try again.',
+  title: 'Template not converted yet',
+  message: 'This template has not been converted to a report format yet, and this server has neither Microsoft Word nor LibreOffice. Please ask the administrator to convert the templates (php artisan report-templates:warm) or to install LibreOffice on the server.',
 };
 
 /** Wraps every "0.00" placeholder in a highlighted <mark> so Tab can jump between them. */
@@ -95,6 +109,15 @@ function ReportEditorContent() {
   const [dirty, setDirty] = useState(false);
   const [blankCount, setBlankCount] = useState({ total: 0, open: 0 });
   const [confirm, setConfirm] = useState(null); // { message, yesText, onYes }
+  const [hasPdf, setHasPdf] = useState(false);   // a PDF copy exists for this test line
+
+  // Doctor's signed copy (image -> WebP, at least 25% smaller; PDF up to 3 MB)
+  const doctorCopyInputRef = useRef(null);
+  const [hasDoctorCopy, setHasDoctorCopy] = useState(false);
+  const [sentBack, setSentBack] = useState(null);   // { note, by, at } when the approver returned it
+  const [approvedAt, setApprovedAt] = useState(null);   // PDF / print open only after approval
+  const [locked, setLocked] = useState(false);          // saved reports cannot be changed until sent back
+  const [uploadingCopy, setUploadingCopy] = useState(false);
 
   const countBlanks = useCallback(() => {
     const marks = editorRef.current ? [...editorRef.current.querySelectorAll('mark.rt-blank')] : [];
@@ -115,7 +138,7 @@ function ReportEditorContent() {
       const res = await fetch(`${API_BASE}/api/report-templates/content?file=${encodeURIComponent(file)}`);
       const data = await res.json();
       if (!res.ok) {
-        if (data.code === 'WORD_NOT_INSTALLED') await showAlert(WORD_MISSING_ALERT);
+        if (data.code === 'NO_CONVERTER') await showAlert(NO_CONVERTER_ALERT);
         else await showAlert({ type: 'error', title: 'Template not opened', message: data.error || 'Could not open the template.' });
         return false;
       }
@@ -140,9 +163,6 @@ function ReportEditorContent() {
 
     (async () => {
       try {
-        const statusRes = await fetch(`${API_BASE}/api/report-templates/status`);
-        const status = await statusRes.json();
-
         const reportRes = await fetch(`${API_BASE}/api/lab/patient-full-report/${encodeURIComponent(bookingRef)}`);
         if (!reportRes.ok) throw new Error('Booking not found.');
         const report = await reportRes.json();
@@ -157,7 +177,12 @@ function ReportEditorContent() {
         setTemplates(tplList);
         setLoading(false);
 
-        if (!status.word_installed) await showAlert(WORD_MISSING_ALERT);
+        setHasPdf(!!line.report_pdf_path);
+        setHasDoctorCopy(!!line.has_doctor_copy);
+        setSentBack(line.sent_back_note ? { note: line.sent_back_note, by: line.sent_back_by, at: line.sent_back_at } : null);
+        setApprovedAt(line.approved_at || null);
+        // Already saved and not sent back -> read only
+        setLocked(!!line.narrative_html && !line.sent_back_note);
 
         if (line.narrative_html) {
           // Re-open the report that was already saved
@@ -193,8 +218,30 @@ function ReportEditorContent() {
     return `<style>${doc.css}</style><div class="rt-doc ${doc.scope}"${marginAttr}>${box.innerHTML}</div>`;
   };
 
-  const saveReport = async (thenPrint = false) => {
+  // Save asks for a confirmation first - after saving, the report is locked for approval
+  const askAndSave = () => {
+    if (saving || locked) return;
+    setConfirm({
+      message: 'Please check the whole report once more. After saving it goes for approval and cannot be changed until the approver sends it back with a comment.',
+      yesText: 'Checked, save it',
+      onYes: () => saveReport(),
+    });
+  };
+
+  const saveReport = async () => {
     if (saving || !editorRef.current) return;
+
+    // The doctor's signed copy is mandatory
+    if (!hasDoctorCopy) {
+      await showAlert({
+        type: 'warning',
+        title: 'Doctor copy required',
+        message: 'Please upload the Doctor copy first (Upload Doctor copy button above), then save the report.',
+      });
+      doctorCopyInputRef.current?.click();
+      return;
+    }
+
     if (!editorRef.current.textContent.trim()) {
       showAlert({ type: 'warning', title: 'Report is empty', message: 'Please select a template or type the report before saving.' });
       return;
@@ -224,16 +271,72 @@ function ReportEditorContent() {
       if (!res.ok) throw new Error(data.error || 'Save failed.');
 
       setDirty(false);
-      if (thenPrint) {
-        router.push(`/lab/print-report?bookingId=${encodeURIComponent(header.booking_id)}&itemId=${encodeURIComponent(item.id)}`);
-      } else {
-        await showAlert({ type: 'success', title: 'Report saved', message: `${item.test_name} report saved for ${header.patient_name}.` });
+      setHasPdf(!!data.pdf);
+      setSentBack(null);
+      setApprovedAt(null);   // every save has to be approved again
+      setLocked(true);       // and the report is locked until it comes back
+      {
+        const pdfNote = data.pdf
+          ? ` A PDF copy (${Math.max(1, Math.round((data.pdf.size || 0) / 1024))} KB) is saved against this patient and bill.`
+          : (data.pdf_error ? ' The report is saved, but the PDF copy could not be created.' : '');
+        await showAlert({ type: 'success', title: 'Report saved', message: `${item.test_name} report saved for ${header.patient_name}.${pdfNote}` });
       }
     } catch (e) {
       showAlert({ type: 'error', title: 'Report not saved', message: e.message });
     } finally {
       setSaving(false);
     }
+  };
+
+  const uploadDoctorCopy = async (e) => {
+    const file = e.target.files?.[0];
+    if (doctorCopyInputRef.current) doctorCopyInputRef.current.value = '';
+    if (!file || !item) return;
+
+    const body = new FormData();
+    body.append('id', item.id);
+    body.append('file', file);
+
+    setUploadingCopy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/lab/doctor-copy`, {
+        method: 'POST',
+        headers: { 'X-User-Name': activeUser?.username || 'System' },
+        body,
+      });
+      const data = await res.json().catch(() => ({ error: 'Upload failed.' }));
+      if (!res.ok) throw new Error(data.error || 'Upload failed.');
+
+      setHasDoctorCopy(true);
+      const kb = (n) => Math.max(1, Math.round((n || 0) / 1024));
+      const note = /\.pdf$/i.test(data.file)
+        ? `PDF saved (${kb(data.size)} KB).`
+        : `Converted to WebP: ${kb(data.original_size)} KB -> ${kb(data.size)} KB (${data.saved_percent}% smaller).`;
+      await showAlert({ type: 'success', title: 'Doctor copy uploaded', message: `${note} It is linked to bill ${header.booking_no}.` });
+    } catch (err) {
+      await showAlert({ type: 'error', title: 'Upload failed', message: err.message });
+    } finally {
+      setUploadingCopy(false);
+    }
+  };
+
+  // Print: only for an approved report. Unsaved changes are saved first, so the print matches the screen.
+  const printReport = async () => {
+    if (!item || saving) return;
+
+    if (!approvedAt) {
+      await showAlert(WAITING_APPROVAL_ALERT);
+      return;
+    }
+    if (dirty && !locked) {
+      await showAlert({
+        type: 'warning',
+        title: 'Unsaved changes',
+        message: 'Save the report first. Saving sends it for approval again, and printing opens once it is approved.',
+      });
+      return;
+    }
+    router.push(`/lab/print-report?bookingId=${encodeURIComponent(header.booking_id)}&itemId=${encodeURIComponent(item.id)}`);
   };
 
   // Tab / Shift+Tab: select the next / previous yellow blank so typing replaces it
@@ -277,10 +380,18 @@ function ReportEditorContent() {
     const onKey = (e) => {
       if (!(e.ctrlKey || e.metaKey) || loading || error || !item) return;
       const key = e.key.toLowerCase();
-      if (key === 's' || key === 'p') {
+      if (key === 's') {
         e.preventDefault();
         e.stopPropagation();
-        saveReport(key === 'p');
+        if (locked) {
+          showAlert(LOCKED_ALERT);
+        } else {
+          askAndSave();
+        }
+      } else if (key === 'p') {
+        e.preventDefault();
+        e.stopPropagation();
+        printReport();
       }
     };
     window.addEventListener('keydown', onKey, true);
@@ -364,11 +475,73 @@ function ReportEditorContent() {
           <button type="button" className={styles.btn} onClick={goBack}>
             <ArrowLeft size={16} /> Back
           </button>
-          <button type="button" className={`${styles.btn} ${styles.btnSave}`} onClick={() => saveReport(false)} disabled={saving || loading || !!error}>
-            <Save size={16} /> {saving ? 'Saving...' : 'Save (Ctrl+S)'}
+          {!locked && (
+            <button type="button" className={`${styles.btn} ${styles.btnSave}`} onClick={askAndSave} disabled={saving || loading || !!error}>
+              <Save size={16} /> {saving ? 'Saving...' : 'Save (Ctrl+S)'}
+            </button>
+          )}
+          <input
+            ref={doctorCopyInputRef}
+            type="file"
+            accept="image/*,.pdf"
+            style={{ display: 'none' }}
+            onChange={uploadDoctorCopy}
+          />
+          <button
+            type="button"
+            className={styles.btn}
+            onClick={() => doctorCopyInputRef.current?.click()}
+            disabled={uploadingCopy || loading || !!error}
+            title="Upload the doctor's signed copy (image or PDF up to 3 MB)"
+          >
+            <Upload size={16} /> {uploadingCopy ? 'Uploading...' : (hasDoctorCopy ? 'Replace Doctor copy' : 'Upload Doctor copy')}
           </button>
-          <button type="button" className={`${styles.btn} ${styles.btnPrint}`} onClick={() => saveReport(true)} disabled={saving || loading || !!error}>
-            <Printer size={16} /> Save & Print (Ctrl+P)
+          {!hasDoctorCopy && !loading && !error && (
+            <span className={styles.requiredNote} title="A report cannot be saved before the doctor copy is uploaded">
+              Doctor copy required
+            </span>
+          )}
+          {hasDoctorCopy && item && (
+            <a
+              className={styles.btn}
+              href={`${API_BASE}/api/lab/doctor-copy/${encodeURIComponent(item.id)}`}
+              target="_blank"
+              rel="noreferrer"
+              title="Open the uploaded doctor copy"
+            >
+              <Paperclip size={16} /> Doctor copy
+            </a>
+          )}
+          {hasPdf && item && (
+            approvedAt ? (
+              <a
+                className={styles.btn}
+                href={`${API_BASE}/api/lab/report-pdf/${encodeURIComponent(item.id)}`}
+                target="_blank"
+                rel="noreferrer"
+                title="Open the approved PDF"
+              >
+                <FileDown size={16} /> PDF
+              </a>
+            ) : (
+              <button
+                type="button"
+                className={styles.btn}
+                onClick={() => showAlert(WAITING_APPROVAL_ALERT)}
+                title="Available after approval"
+              >
+                <FileDown size={16} /> PDF
+              </button>
+            )
+          )}
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnPrint}`}
+            onClick={printReport}
+            disabled={saving || loading || !!error}
+            title={approvedAt ? 'Print this report' : 'Available after approval'}
+          >
+            <Printer size={16} /> Print (Ctrl+P)
           </button>
         </div>
       </div>
@@ -432,6 +605,27 @@ function ReportEditorContent() {
         </div>
       )}
 
+      {locked && (
+        <div className={styles.lockedBar}>
+          <TriangleAlert size={16} />
+          <span>
+            {approvedAt
+              ? `This report was approved on ${approvedAt}, so it is read only.`
+              : 'This report is saved and waiting for approval, so it is read only. The approver has to send it back with a comment before it can be changed.'}
+          </span>
+        </div>
+      )}
+
+      {sentBack && (
+        <div className={styles.sentBackBar}>
+          <TriangleAlert size={16} />
+          <span>
+            <strong>Sent back for correction{sentBack.by ? ` by ${sentBack.by}` : ''}{sentBack.at ? ` (${sentBack.at})` : ''}:</strong> {sentBack.note}
+            {' '}— correct the report (and re-upload the doctor copy if needed), then save again.
+          </span>
+        </div>
+      )}
+
       {confirm && (
         <div className={styles.confirmBar}>
           <TriangleAlert size={16} />
@@ -467,12 +661,12 @@ function ReportEditorContent() {
             </div>
           )}
 
-          {templateLoading && <div className={styles.state} style={{ padding: '24px' }}>Opening template with Microsoft Word...</div>}
+          {templateLoading && <div className={styles.state} style={{ padding: '24px' }}>Opening template...</div>}
 
           <div
             ref={editorRef}
             className={`${styles.editor} rt-doc ${doc.scope}`}
-            contentEditable={!templateLoading}
+            contentEditable={!templateLoading && !locked}
             suppressContentEditableWarning
             spellCheck
             onInput={() => { setDirty(true); countBlanks(); }}

@@ -102,6 +102,8 @@ return [
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),
+            // Fail fast when the SQL Server is unreachable, instead of hanging for 30 s per request
+            'login_timeout' => env('DB_LOGIN_TIMEOUT', 5),
             'host' => env('DB_HOST', 'localhost'),
             'port' => env('DB_PORT', '1433'),
             'database' => env('DB_DATABASE', 'laravel'),

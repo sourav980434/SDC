@@ -14,6 +14,7 @@ When you introduce a new shared component or pattern, add a numbered section bel
 | 2 | [Backend Performance Rules](#2-backend-performance-rules) | All APIs & data-loading pages | 13-Sep-2026 |
 | 3 | [Keyboard Shortcut Buttons (underline + flash)](#3-keyboard-shortcut-buttons-underline--flash) | Any button / link with a shortcut | 13-Sep-2026 |
 | 4 | [Searchable dropdowns (`SearchableSelect`)](#4-searchable-dropdowns-searchableselect) | Any dropdown filled from the database | 22-Sep-2026 |
+| 5 | [User activity logging (who did what, when)](#5-user-activity-logging-who-did-what-when) | Every create / update / delete API | 24-Sep-2026 |
 
 ---
 
@@ -231,3 +232,20 @@ import SearchableSelect from '@/components/SearchableSelect';
 - Enter picks the highlighted option **and** is then passed to `onKeyDown`, so "Enter → next field" forms (Booking) keep working.
 - The list is portalled to `<body>` — never clipped by cards, tables or modals.
 
+---
+
+## 5. User activity logging (who did what, when)
+
+### Rule
+Every data change must be traceable to a user and a time. Two things make that automatic — do not work around them:
+
+1. **Frontend:** `installApiUserHeaders()` ([lib/apiClient.js](frontend/src/lib/apiClient.js), started once in `AuthContext`) wraps `window.fetch` and adds **`X-User-Code`** and **`X-User-Name`** to every call to the API. Never strip these headers; a call may set its own only to override them.
+2. **Backend:** [AuditLogMiddleware](backend/app/Http/Middleware/AuditLogMiddleware.php) writes a row in `tbl_web_audit_logs` for **every POST / PUT / PATCH / DELETE** on `/api/*` — user code, user name, module, action, a short payload summary (passwords masked, long fields as size), HTTP status, IP and time.
+
+### When writing a new route
+- Read the user with `getCurrentUserCode($request)` / `getCurrentUserName($request)` — never hardcode a user.
+- Store it on the row itself where the table has such a column (`created_by`, `AddUserCode` / `ModUserCode`, `result_entered_by`, `verified_by`, ...), together with the time.
+- Call `logAuditLog($userCode, $userName, $module, $action, $description, $ip)` when a readable sentence is useful ("Report approved for booking detail #123"). The middleware then skips its generic line for that request, so there is no duplicate.
+
+### Where to read it
+**SetUp → System Audit Trail** (`/setup/audit-trail`): search plus filters for user, module, action and a date range (`GET /api/setup/audit-logs`, options from `GET /api/setup/audit-filters`).

@@ -30,9 +30,14 @@ class ReportTemplateService
         return rtrim($isAbsolute ? $path : base_path($path), '\\/');
     }
 
+    /**
+     * Where converted HTML is stored. Default is REPORT_MASTER/_html, so the converted templates
+     * travel with the folder (git / copy) and a server without Word or LibreOffice can still
+     * open every template that was converted before.
+     */
     public static function cacheDir(): string
     {
-        $dir = config('report_templates.cache_path');
+        $dir = config('report_templates.cache_path') ?: (self::dir() . DIRECTORY_SEPARATOR . '_html');
         if (!is_dir($dir)) {
             @mkdir($dir, 0777, true);
         }
@@ -51,6 +56,75 @@ class ReportTemplateService
             $process->run();
             return $process->isSuccessful();
         });
+    }
+
+    /** Path of the LibreOffice binary (works on Linux / cloud servers), or null. Cached 10 minutes. */
+    public static function libreOfficePath(): ?string
+    {
+        return Cache::remember('report_tpl_libreoffice', 600, function () {
+            $candidates = array_filter([
+                config('report_templates.libreoffice'),
+                '/usr/bin/soffice',
+                '/usr/local/bin/soffice',
+                '/opt/libreoffice/program/soffice',
+                'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+                'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+            ]);
+            foreach ($candidates as $path) {
+                if (is_file($path)) {
+                    return $path;
+                }
+            }
+            // Otherwise whatever is on PATH
+            foreach (['soffice', 'libreoffice'] as $bin) {
+                try {
+                    $process = new Process([$bin, '--version'], null, PHP_OS_FAMILY === 'Windows' ? self::windowsEnv() : null);
+                    $process->setTimeout(20);
+                    $process->run();
+                    if ($process->isSuccessful()) {
+                        return $bin;
+                    }
+                } catch (\Throwable $e) {
+                    // not installed
+                }
+            }
+            return null;
+        });
+    }
+
+    /** True when the pure-PHP converter is installed (phpoffice/phpword) - needs nothing on the OS. */
+    public static function phpWordAvailable(): bool
+    {
+        return class_exists(\PhpOffice\PhpWord\IOFactory::class);
+    }
+
+    /**
+     * Converters this machine can use, best layout first:
+     *   'word'        - MS Word via COM (Windows, best fidelity, handles legacy .dot)
+     *   'libreoffice' - soffice --headless (Linux / cloud, handles legacy .dot)
+     *   'phpword'     - pure PHP, no OS dependency; .docx / .rtf only, simpler layout
+     * Reports themselves need NO converter: converted templates are cached in REPORT_MASTER/_html
+     * and travel with the folder.
+     */
+    public static function converters(): array
+    {
+        $list = [];
+        if (self::wordInstalled()) {
+            $list[] = 'word';
+        }
+        if (self::libreOfficePath()) {
+            $list[] = 'libreoffice';
+        }
+        if (self::phpWordAvailable()) {
+            $list[] = 'phpword';
+        }
+        return $list;
+    }
+
+    /** The converter that would be used first, or null when this machine has none. */
+    public static function converter(): ?string
+    {
+        return self::converters()[0] ?? null;
     }
 
     /** Parses a template file name into its test link, or null when the name has no test code. */
@@ -308,6 +382,28 @@ class ReportTemplateService
         return $doctors;
     }
 
+    /**
+     * Conversion coverage of the templates folder: how many linked templates already have their
+     * converted HTML in REPORT_MASTER/_html. A server with no converter can open exactly those.
+     */
+    public static function coverage(): array
+    {
+        $total = 0;
+        $converted = 0;
+        $missing = [];
+        foreach (self::index() as $list) {
+            foreach ($list as $tpl) {
+                $total++;
+                if (self::isCached($tpl['file'])) {
+                    $converted++;
+                } elseif (count($missing) < 20) {
+                    $missing[] = $tpl['file'];
+                }
+            }
+        }
+        return ['total' => $total, 'converted' => $converted, 'pending' => $total - $converted, 'pending_sample' => $missing];
+    }
+
     public static function path(string $file): string
     {
         return self::dir() . DIRECTORY_SEPARATOR . $file;
@@ -352,7 +448,10 @@ class ReportTemplateService
     {
         $cacheFile = self::cacheFile($file);
         if (is_file($cacheFile)) {
-            return json_decode(file_get_contents($cacheFile), true);
+            $content = json_decode(file_get_contents($cacheFile), true);
+            // Templates converted before the layout fix still carry Word's pinned shapes
+            $content['html'] = self::normaliseRules(self::sanitizeLayout($content['html'] ?? ''));
+            return $content;
         }
 
         $failed = self::convert([$file]);
@@ -363,65 +462,71 @@ class ReportTemplateService
     }
 
     /**
-     * Converts templates in one Word session and caches the cleaned HTML.
-     * Returns [file => error message] for the ones that failed.
+     * Converts templates to HTML and caches them in REPORT_MASTER/_html, using MS Word when this
+     * machine has it, otherwise LibreOffice. Returns [file => error code] for the ones that failed.
+     * Reports never need a converter: the cache travels with the templates folder.
      */
     public static function convert(array $files): array
     {
-        if (!self::wordInstalled()) {
-            Cache::forget('report_tpl_word_installed');   // re-check next time, Word may get installed
-            return array_fill_keys($files, 'WORD_NOT_INSTALLED');
+        $converters = self::converters();
+        if (!$converters) {
+            Cache::forget('report_tpl_word_installed');   // re-check next time, one may get installed
+            Cache::forget('report_tpl_libreoffice');
+            return array_fill_keys($files, 'NO_CONVERTER');
         }
 
-        $dir = self::dir();
+        // Try the best converter first and retry whatever it could not handle with the next one
+        $pending = array_values($files);
+        $failed = [];
+        foreach ($converters as $converter) {
+            if (!$pending) {
+                break;
+            }
+            $failed = self::convertWith($converter, $pending);
+            $pending = array_keys($failed);
+        }
+
+        if ($failed) {
+            Log::warning('Report template conversion failed', [
+                'converters' => $converters,
+                'files' => array_keys($failed),
+            ]);
+        }
+        return $failed;
+    }
+
+    /** Runs one converter over the given files and caches what it produced. */
+    private static function convertWith(string $converter, array $files): array
+    {
         $work = self::cacheDir() . DIRECTORY_SEPARATOR . 'work_' . uniqid();
         @mkdir($work, 0777, true);
 
-        $lines = [];
-        $htmPaths = [];
-        foreach (array_values($files) as $i => $file) {
-            $htmPaths[$file] = $work . DIRECTORY_SEPARATOR . "t$i.htm";
-            $lines[] = str_replace('/', '\\', "$dir/$file") . '|' . $htmPaths[$file];
-        }
-        $listFile = $work . DIRECTORY_SEPARATOR . 'list.txt';
-        file_put_contents($listFile, implode("\r\n", $lines));
-
-        $process = new Process([
-            'powershell', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-            '-File', resource_path('scripts/doc2html.ps1'), '-ListFile', $listFile,
-        ], null, self::windowsEnv());
-        $process->setTimeout(60 + 15 * count($files));
-
         $failed = [];
         try {
-            $process->run();
-            $output = $process->getOutput();
+            $htmPaths = match ($converter) {
+                'word' => self::runWordConverter($files, $work),
+                'libreoffice' => self::runLibreOfficeConverter($files, $work),
+                'phpword' => self::runPhpWordConverter($files, $work),
+                default => null,
+            };
 
-            if (str_contains($output, 'NOWORD|')) {
+            if ($htmPaths === null) {
                 Cache::forget('report_tpl_word_installed');
-                return array_fill_keys($files, 'WORD_NOT_INSTALLED');
+                Cache::forget('report_tpl_libreoffice');
+                return array_fill_keys($files, 'NO_CONVERTER');
             }
 
             foreach ($files as $file) {
-                $htm = $htmPaths[$file];
-                if (!is_file($htm)) {
+                $htm = $htmPaths[$file] ?? null;
+                if (!$htm || !is_file($htm)) {
                     $failed[$file] = 'CONVERSION_FAILED';
                     continue;
                 }
                 $content = self::clean(file_get_contents($htm), $htm, self::scopeFor($file));
                 file_put_contents(self::cacheFile($file), json_encode($content));
             }
-
-            if ($failed) {
-                Log::warning('Report template conversion failed', [
-                    'files' => array_keys($failed),
-                    'exit_code' => $process->getExitCode(),
-                    'output' => mb_substr($output, 0, 1000),
-                    'error_output' => mb_substr($process->getErrorOutput(), 0, 1000),
-                ]);
-            }
         } catch (\Throwable $e) {
-            Log::warning('Report template conversion error: ' . $e->getMessage(), ['files' => $files]);
+            Log::warning("Report template conversion error ($converter): " . $e->getMessage(), ['files' => $files]);
             foreach ($files as $file) {
                 if (!is_file(self::cacheFile($file))) {
                     $failed[$file] = 'CONVERSION_FAILED';
@@ -464,6 +569,7 @@ class ReportTemplateService
         }
 
         $html = preg_match('/<body[^>]*>(.*)<\/body>/is', $raw, $b) ? $b[1] : $raw;
+        $html = self::normaliseRules(self::sanitizeLayout($html));
 
         // Pictures (logos, signatures) are saved beside the .htm - embed them
         $baseDir = dirname($htmPath);
@@ -481,6 +587,103 @@ class ReportTemplateService
         $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
 
         return ['scope' => $scope, 'css' => trim($css), 'html' => trim($html), 'page' => $page];
+    }
+
+    /**
+     * MS Word (Windows only, best layout fidelity). Returns [template file => produced .htm path],
+     * or null when Word turned out not to be usable after all.
+     */
+    private static function runWordConverter(array $files, string $work): ?array
+    {
+        $dir = self::dir();
+        $lines = [];
+        $htmPaths = [];
+        foreach (array_values($files) as $i => $file) {
+            $htmPaths[$file] = $work . DIRECTORY_SEPARATOR . "t$i.htm";
+            $lines[] = str_replace('/', '\\', "$dir/$file") . '|' . $htmPaths[$file];
+        }
+        $listFile = $work . DIRECTORY_SEPARATOR . 'list.txt';
+        file_put_contents($listFile, implode("\r\n", $lines));
+
+        $process = new Process([
+            'powershell', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+            '-File', resource_path('scripts/doc2html.ps1'), '-ListFile', $listFile,
+        ], null, self::windowsEnv());
+        $process->setTimeout(60 + 15 * count($files));
+        $process->run();
+
+        if (str_contains($process->getOutput(), 'NOWORD|')) {
+            return null;
+        }
+        return $htmPaths;
+    }
+
+    /**
+     * Pure-PHP converter (phpoffice/phpword) - needs nothing installed on the machine, so it also
+     * works on a locked-down cloud server. It reads .docx / .rtf well; the legacy binary .doc/.dot
+     * reader is limited, so those files usually fall back to Word or LibreOffice.
+     */
+    private static function runPhpWordConverter(array $files, string $work): ?array
+    {
+        if (!self::phpWordAvailable()) {
+            return null;
+        }
+
+        $readers = ['docx' => 'Word2007', 'dotx' => 'Word2007', 'rtf' => 'RTF', 'doc' => 'MsDoc', 'dot' => 'MsDoc'];
+        $htmPaths = [];
+        // PHPWord's legacy .doc reader is noisy (warnings / deprecations); keep them out of the log
+        $previousLevel = error_reporting(0);
+        foreach ($files as $file) {
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            if (!isset($readers[$ext])) {
+                continue;
+            }
+            $out = $work . DIRECTORY_SEPARATOR . md5($file) . '.html';
+            try {
+                $doc = \PhpOffice\PhpWord\IOFactory::load(self::path($file), $readers[$ext]);
+                \PhpOffice\PhpWord\IOFactory::createWriter($doc, 'HTML')->save($out);
+                if (is_file($out) && filesize($out) > 0) {
+                    $htmPaths[$file] = $out;
+                }
+            } catch (\Throwable $e) {
+                Log::info("PHPWord could not read $file: " . $e->getMessage());
+            }
+        }
+        error_reporting($previousLevel);
+        return $htmPaths;
+    }
+
+    /**
+     * LibreOffice headless - the converter for Linux / cloud servers. One call converts every file;
+     * output lands in $work as <original name>.html.
+     */
+    private static function runLibreOfficeConverter(array $files, string $work): ?array
+    {
+        $soffice = self::libreOfficePath();
+        if (!$soffice) {
+            return null;
+        }
+
+        $dir = self::dir();
+        $command = [
+            $soffice,
+            '-env:UserInstallation=file:///' . str_replace('\\', '/', $work) . '/lo_profile',
+            '--headless', '--norestore', '--convert-to', 'html:HTML (StarWriter)',
+            '--outdir', $work,
+        ];
+        foreach ($files as $file) {
+            $command[] = $dir . DIRECTORY_SEPARATOR . $file;
+        }
+
+        $process = new Process($command, null, PHP_OS_FAMILY === 'Windows' ? self::windowsEnv() : null);
+        $process->setTimeout(90 + 30 * count($files));
+        $process->run();
+
+        $htmPaths = [];
+        foreach ($files as $file) {
+            $htmPaths[$file] = $work . DIRECTORY_SEPARATOR . pathinfo($file, PATHINFO_FILENAME) . '.html';
+        }
+        return $htmPaths;
     }
 
     /**
@@ -515,16 +718,55 @@ class ReportTemplateService
         ];
     }
 
+    /**
+     * Word draws letterhead rules and shapes as small images pinned with
+     * "position:relative; z-index; left/top", which in a browser land in the middle of the text.
+     * Their position is dropped so they simply flow where they belong.
+     */
+    public static function sanitizeLayout(string $html): string
+    {
+        // Word writes the style with either quote style and wraps long values over several lines
+        return preg_replace_callback('/style\s*=\s*(["\'])(.*?)\1/is', function ($m) {
+            $quote = $m[1];
+            $style = $m[2];
+            if (stripos($style, 'z-index') === false) {
+                return $m[0];
+            }
+            $style = preg_replace('/(^|;)\s*(position|z-index|left|top|margin-left|margin-top)\s*:[^;]*/i', '$1', $style);
+            $style = preg_replace('/;{2,}/', ';', $style);
+            $style = trim($style, " ;\r\n\t");
+            return 'style=' . $quote . $style . $quote;
+        }, $html);
+    }
+
+    /**
+     * Word's letterhead rules are hair-thin images (2 px tall, ~795 px wide) that would run past
+     * the edge of an A4 page. They become a plain rule that always fits the page width.
+     */
+    public static function normaliseRules(string $html): string
+    {
+        return preg_replace_callback('/<img[^>]*>/i', function ($m) {
+            if (!preg_match('/height\s*=\s*"?(\d+)/i', $m[0], $h) || (int) $h[1] > 4) {
+                return $m[0];
+            }
+            return '<hr style="border:none;border-top:1px solid #000;width:100%;margin:8px 0;">';
+        }, $html);
+    }
+
     private static function scopeFor(string $file): string
     {
         return 'rt-' . substr(md5(strtolower($file)), 0, 10);
     }
 
+    /**
+     * Cache file name from the template's CONTENT hash - a git checkout or a file copy changes the
+     * modified time but not the content, so the cache stays valid wherever the folder is deployed.
+     */
     private static function cacheFile(string $file): string
     {
         $path = self::dir() . DIRECTORY_SEPARATOR . $file;
-        $stamp = is_file($path) ? filemtime($path) . '_' . filesize($path) : '0';
-        return self::cacheDir() . DIRECTORY_SEPARATOR . md5(strtolower($file) . '|' . $stamp) . '.json';
+        $hash = is_file($path) ? md5_file($path) : '0';
+        return self::cacheDir() . DIRECTORY_SEPARATOR . md5(strtolower($file) . '|' . $hash) . '.json';
     }
 
     private static function removeDir(string $dir): void

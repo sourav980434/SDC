@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Bell, Settings, Menu } from 'lucide-react';
+import { Search, Bell, Menu, ChevronDown, Headphones, HelpCircle, LogOut, PanelLeftClose, PanelLeftOpen, CheckCheck } from 'lucide-react';
 import styles from '../app/layout.module.css';
 
 import { fetchLabSettings } from '../lib/labSettings';
 import { useAuth } from '@/context/AuthContext';
 import API_BASE from '@/lib/apiConfig';
 
-export default function Header({ toggleSidebar }) {
+export default function Header({ toggleSidebar, isCollapsed = false, onToggleCollapse = () => {} }) {
   const router = useRouter();
   const { user: activeUser, logout } = useAuth();
   const [labName, setLabName] = useState('Santoshpur Diagnostic Centre');
@@ -18,6 +18,79 @@ export default function Header({ toggleSidebar }) {
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const searchContainerRef = useRef(null);
+
+  // Notifications (bell)
+  const [notifications, setNotifications] = useState([]);
+  const [unread, setUnread] = useState(0);
+  const [isBellOpen, setIsBellOpen] = useState(false);
+  const bellRef = useRef(null);
+
+  const loadNotifications = React.useCallback(() => {
+    if (!activeUser) return;
+    fetch(`${API_BASE}/api/notifications?unread=1&per_page=8`)
+      .then(res => res.json())
+      .then(data => {
+        setNotifications(data.data || []);
+        setUnread(data.unread || 0);
+      })
+      .catch(() => {});
+  }, [activeUser]);
+
+  useEffect(() => {
+    loadNotifications();
+    const timer = setInterval(loadNotifications, 60000);          // check once a minute
+    const onChanged = () => loadNotifications();                  // the Notifications page tells us
+    window.addEventListener('sdcp-notifications-changed', onChanged);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('sdcp-notifications-changed', onChanged);
+    };
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    if (!isBellOpen) return;
+    const onDown = (e) => { if (!bellRef.current?.contains(e.target)) setIsBellOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setIsBellOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [isBellOpen]);
+
+  const markRead = async (id) => {
+    await fetch(`${API_BASE}/api/notifications/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(id ? { id } : {}),
+    }).catch(() => {});
+    loadNotifications();
+  };
+
+  const openNotification = async (n) => {
+    setIsBellOpen(false);
+    await markRead(n.id);                 // read notifications leave the bell
+    if (n.link) router.push(n.link);
+  };
+
+  // Profile menu (user card, Support, Help and Log Off live here)
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    if (!isProfileOpen) return;
+    const onDown = (e) => {
+      if (!profileRef.current?.contains(e.target)) setIsProfileOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setIsProfileOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [isProfileOpen]);
 
   useEffect(() => {
     fetchLabSettings().then(cfg => {
@@ -114,6 +187,15 @@ export default function Header({ toggleSidebar }) {
         <button className={styles.menuToggleBtn} onClick={toggleSidebar}>
           <Menu size={24} />
         </button>
+        <button
+          type="button"
+          className={styles.collapseBtn}
+          onClick={onToggleCollapse}
+          title={isCollapsed ? 'Expand menu' : 'Collapse menu'}
+          aria-label={isCollapsed ? 'Expand menu' : 'Collapse menu'}
+        >
+          {isCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+        </button>
         <span className={styles.headerTitle}>{labName}</span>
         <div ref={searchContainerRef} className={styles.searchBar} style={{ position: 'relative' }}>
           <Search size={16} className={styles.searchIcon} />
@@ -209,27 +291,101 @@ export default function Header({ toggleSidebar }) {
       </div>
       
       <div className={styles.headerRight}>
-        {activeUser && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 8px', backgroundColor: 'var(--surface-container-low)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--outline-variant)', flexShrink: 0 }}>
-            <div style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'var(--on-primary)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '800', fontSize: '11px', flexShrink: 0 }}>
-              {(activeUser.username || 'U')[0].toUpperCase()}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', minWidth: 0 }}>
-              <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary)', lineHeight: '1.2' }}>{activeUser.username}</span>
-              <span style={{ fontSize: '9.5px', color: 'var(--outline)', fontWeight: '600', lineHeight: '1.2' }}>{activeUser.role_name || activeUser.role_code}</span>
-            </div>
-          </div>
-        )}
-
         <div className={styles.headerLeft}>
-          <button className={styles.iconBtn}>
-            <Bell size={20} />
-            <span className={styles.iconBadge}></span>
-          </button>
+          <div className={styles.bellWrap} ref={bellRef}>
+            <button
+              className={styles.iconBtn}
+              onClick={() => setIsBellOpen(v => !v)}
+              title={unread ? `${unread} unread notification${unread === 1 ? '' : 's'}` : 'Notifications'}
+            >
+              <Bell size={20} />
+              {unread > 0 && <span className={styles.bellCount}>{unread > 99 ? '99+' : unread}</span>}
+            </button>
+
+            {isBellOpen && (
+              <div className={styles.bellMenu}>
+                <div className={styles.bellHead}>
+                  <span>Notifications{unread ? ` (${unread} unread)` : ''}</span>
+                  {unread > 0 && (
+                    <button type="button" onClick={() => markRead(null)} title="Mark all as read">
+                      <CheckCheck size={14} /> Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {notifications.length === 0 ? (
+                  <div className={styles.bellEmpty}>Nothing new. Everything is read.</div>
+                ) : (
+                  notifications.map(n => (
+                    <button key={n.id} type="button" className={styles.bellItem} onClick={() => openNotification(n)}>
+                      <span className={styles.bellItemTitle}>{n.title}</span>
+                      <span className={styles.bellItemMsg}>{n.message}</span>
+                      <span className={styles.bellItemMeta}>{n.from ? `${n.from} · ` : ''}{n.created_at}</span>
+                    </button>
+                  ))
+                )}
+
+                <button
+                  type="button"
+                  className={styles.bellAll}
+                  onClick={() => { setIsBellOpen(false); router.push('/notifications'); }}
+                >
+                  View all notifications
+                </button>
+              </div>
+            )}
+          </div>
+          {/* Settings icon has no page behind it yet
           <button className={styles.iconBtn}>
             <Settings size={20} />
           </button>
+          */}
         </div>
+        {activeUser && (
+          <div className={styles.profileWrap} ref={profileRef}>
+            <button
+              type="button"
+              className={styles.profileBtn}
+              onClick={() => setIsProfileOpen(v => !v)}
+              title="Account menu"
+              aria-expanded={isProfileOpen}
+            >
+              <div className={styles.profileAvatar}>
+                {(activeUser.username || 'U')[0].toUpperCase()}
+              </div>
+              <div className={styles.profileText}>
+                <span className={styles.profileName}>{activeUser.username}</span>
+                <span className={styles.profileRole}>{activeUser.role_name || activeUser.role_code}</span>
+              </div>
+              <ChevronDown size={14} className={isProfileOpen ? styles.profileChevronOpen : styles.profileChevron} />
+            </button>
+
+            {isProfileOpen && (
+              <div className={styles.profileMenu}>
+                <div className={styles.profileHeader}>
+                  <div className={styles.profileAvatarLarge}>
+                    {(activeUser.username || 'U')[0].toUpperCase()}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className={styles.profileHeaderName}>{activeUser.full_name || activeUser.username}</div>
+                    <div className={styles.profileHeaderRole}>{activeUser.role_name || activeUser.role_code}</div>
+                  </div>
+                </div>
+
+                <a className={styles.profileItem} href="#" onClick={() => setIsProfileOpen(false)}>
+                  <Headphones size={16} /> Support
+                </a>
+                <a className={styles.profileItem} href="#" onClick={() => setIsProfileOpen(false)}>
+                  <HelpCircle size={16} /> Help
+                </a>
+
+                <button type="button" className={styles.profileLogout} onClick={() => { setIsProfileOpen(false); logout(); }}>
+                  <LogOut size={16} /> Log Off
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );

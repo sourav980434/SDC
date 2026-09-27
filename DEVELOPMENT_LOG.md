@@ -333,8 +333,10 @@
 * **উদ্দেশ্য:** পুরনো সফটওয়্যারের মতোই — টেস্টের Word টেমপ্লেট খুলে রেজাল্ট বসিয়ে প্রিন্ট; তবে এখন ব্রাউজারের ভেতরেই Word-এর মতো এডিটরে।
 * **টেমপ্লেট ফোল্ডার:** `backend/storage/app/REPORT_MASTER` (git-এ নেই — নতুন PC-তে হাতে কপি করতে হবে)। পাথ `.env`-এর `REPORT_TEMPLATE_PATH` থেকে বদলানো যায়।
 * **অটো-লিঙ্ক:** ফাইলের নাম থেকেই টেস্ট কোড — `T0000006_D0000390_xxx.dot` → টেস্ট `T0000006`, ভ্যারিয়েন্ট `D0000390`; `U0000003_T0000010_xxx.dot` → ইউজারের নিজস্ব টেমপ্লেট। নামহীন ফাইল (`1.dot`, `echo.dot` ইত্যাদি) লিঙ্ক হয় না। সবচেয়ে নতুন ফাইল ডিফল্ট।
-* **কনভার্শন:** সার্ভার PC-র **Microsoft Word** (COM, `backend/resources/scripts/doc2html.ps1`) দিয়ে `.dot` → HTML, `storage/app/private/report_template_cache`-এ ক্যাশ (ফাইল বদলালে আবার কনভার্ট)। Word না থাকলে এডিটরে "Microsoft Word Required" অ্যালার্ট দেখায়।
+* **কনভার্শন (ক্লাউড-রেডি, 24-Sep-2026):** টেমপ্লেট একবারই HTML-এ কনভার্ট হয় — **MS Word** (COM, `backend/resources/scripts/doc2html.ps1`) থাকলে তা দিয়ে, নাহলে **LibreOffice** (`soffice --headless`, Linux/ক্লাউডে)। ফলাফল `REPORT_MASTER/_html`-এ ক্যাশ হয়, কী তৈরি হয় **ফাইলের কনটেন্ট হ্যাশ** থেকে (git checkout-এ mtime বদলালেও ক্যাশ কাজ করে)। তাই কনভার্ট করা টেমপ্লেট ফোল্ডারের সঙ্গেই যায় এবং **ক্লাউড সার্ভারে Word/LibreOffice ছাড়াই রিপোর্ট খোলে**। কনভার্টার শুধু নতুন বা বদলানো টেমপ্লেটের জন্য দরকার।
+* **কনভার্টার চেইন (24-Sep-2026):** ১) **MS Word** (COM, সবচেয়ে ভালো লেআউট), ২) **LibreOffice** (`soffice --headless`, Linux/ক্লাউড), ৩) **PHPWord** (`phpoffice/phpword` — বিশুদ্ধ PHP, OS-এ কিছু ইনস্টল লাগে না; `.docx`/`.rtf` ভালো, পুরনো `.doc/.dot` মোটামুটি)। একটি কনভার্টার না পারলে পরেরটি চেষ্টা করে।
 * **আগে থেকে কনভার্ট:** `php artisan report-templates:warm` — সব টেমপ্লেট একবারে কনভার্ট করে, যাতে প্রথমবার খুলতে দেরি না হয়।
+* **প্রস্তুতি যাচাই:** `php artisan report-templates:check` — কোন কনভার্টার আছে এবং কত টেমপ্লেট কনভার্ট হয়েছে তা দেখায়। ক্লাউডে ডিপ্লয়ের আগে এটি `1105 of 1105` দেখাতে হবে।
 * **নতুন APIs:** `GET /api/report-templates/status`, `GET /api/report-templates/lookup?codes=`, `GET /api/report-templates?test_code=`, `GET /api/report-templates/content?file=`, `POST /api/sample-tracking/save-narrative`।
 * **ডাটাবেস:** শুধু পূরণ করা রিপোর্ট সেভ হয় — `tbl_web_booking_dtl.narrative_html` ও `report_template_file` (কলাম না থাকলে প্রথম সেভে নিজে থেকে তৈরি হয়)।
 * **ফ্রন্টএন্ড:** Result Entry-তে টেমপ্লেটওয়ালা টেস্টে **Write/Open Report** বাটন → `/lab/report-editor` (A4 পাতা, পেশেন্ট ডিটেইলস অটো, `0.00` ঘর হলুদ — **Tab** দিয়ে পরের ঘরে, Ctrl+S সেভ, Ctrl+P সেভ ও প্রিন্ট)। Print Report পেজে `itemId` দিলে শুধু সেই টেস্ট প্রিন্ট হয়।
@@ -346,10 +348,83 @@
 * **কাজ:** Preview (Word দিয়ে কনভার্ট করে দেখায়), Download (Word-এ এডিট করার জন্য), **Set Default**, Remove, এবং নতুন `.dot/.doc/.dotx/.docx` **Upload** — ফাইল নিজে থেকেই সঠিক নামে (`T<test>_D<variant>_<time>`) `REPORT_MASTER`-এ সেভ হয়।
 * **ডিফল্ট:** `REPORT_MASTER/_defaults.json`-এ থাকে; না থাকলে সবচেয়ে নতুন ফাইল ডিফল্ট।
 * **Remove:** ফাইল মুছে যায় না — `REPORT_MASTER/_deleted`-এ সরে যায়।
+* **আপলোডের সঙ্গে সঙ্গেই কনভার্ট (24-Sep-2026):** নতুন টেমপ্লেট Upload বা Replace করলেই সঙ্গে সঙ্গে HTML-এ কনভার্ট হয়ে `_html`-এ ক্যাশ হয় — পরে রিপোর্ট লেখার সময় দেরি বা এরর হয় না। কনভার্টার না থাকলে ফাইল সেভ হয়, কিন্তু পেজে ওয়ার্নিং দেখায় (`converted: false`)।
 * **Replace (বিদ্যমান টেমপ্লেট আপডেট):** Download → Word-এ এডিট → **Replace** বাটন। একই নাম, ডাক্তার ও ডিফল্ট থাকে; পুরনো ফাইল `REPORT_MASTER/_versions`-এ ব্যাকআপ হয়। আগে সেভ হওয়া পেশেন্ট রিপোর্ট বদলায় না। API: `POST /api/report-templates/replace` (`template`, `file`)।
 * **APIs:** `GET /api/report-templates/overview`, `POST /api/report-templates/upload`, `POST /api/report-templates/set-default`, `POST /api/report-templates/delete`, `GET /api/report-templates/download`।
+* **পারমিশন (24-Sep-2026):** নতুন মডিউল **`report_templates` — Report Template Master** (`modulesConfig.js`), তাই User Management ও Permission Matrix-এ নিজে থেকেই আসে। সাইডবারে Report Template শুধু অ্যাডমিন বা এই মডিউলপ্রাপ্ত ইউজার দেখেন; বাকি Master মেনু আইটেমগুলো এখন `masters` মডিউলের সঙ্গে বাঁধা। পেজেও `can_view` চেক আছে।
+* **Report Approval পেজ (24-Sep-2026):** Report/Query → **Report Approval** (`/lab/report-approval`, মডিউল `report_approval`, অক্ষর `a`)। বাঁয়ে Pending/Approved/All ওয়ার্কলিস্ট, ডানে **সিস্টেম রিপোর্ট PDF ও ডাক্তারের কপি পাশাপাশি** — মিলিয়ে দেখে **Approve Report**। ডাক্তারের কপি না থাকলে অ্যাপ্রুভ হয় না; অ্যাপ্রুভড রিপোর্ট **Send back for correction** দিয়ে ফেরত পাঠানো যায় (রিমার্কসহ)। অ্যাপ্রুভ করলে `test_status = VERIFIED` হয়।
+* **ফুল-ট্যাব রিভিউ ও কমেন্ট (24-Sep-2026):** Report Approval-এ **Open in new tab** → `/lab/report-approval/review?id=<dtl>` — বড় করে রিপোর্ট ও ডাক্তারের কপি পাশাপাশি, যেকোনো একটিকে **Full width** করা যায়, সেখান থেকেই Approve বা **Send back with comment**। কমেন্ট ছাড়া ফেরত পাঠানো যায় না (`422`)। ফেরত পাঠালে `report_sent_back_at/by` সেভ হয়, লিস্টে **Sent Back** ট্যাব ও ব্যাজ দেখায়, এবং **Lab Result Entry-তে ওই টেস্টের কার্ডে কমেন্ট দেখা যায়** — যাতে রিপোর্ট ঠিক করে ডাক্তারের কপি আবার আপলোড করা যায়। অ্যাপ্রুভ করলে ফেরতের চিহ্ন মুছে যায়।
+* **শর্টকাট:** Lab Result Entry-তে যে টেস্টের টেমপ্লেট নেই, সেখানে **Upload Template** বাটন — `/master/report-templates?test=<code>` খুলে ওই টেস্ট নিজে থেকেই সিলেক্ট হয়ে যায় (পারমিশন থাকলে তবেই বাটন দেখা যায়)।
 * **খেয়াল রাখুন:** PHP-র `upload_max_filesize` (বর্তমানে 2M) ও `post_max_size` (8M) এর চেয়ে বড় ফাইল আপলোড হবে না — বড় টেমপ্লেটের জন্য `php.ini`-তে বাড়াতে হবে।
 * **ফিক্স:** `php artisan serve` চাইল্ড প্রসেসে Windows env ভ্যারিয়েবল দেয় না — PowerShell/Word চালানোর সময় `SystemRoot`, `TEMP` ইত্যাদি আলাদা করে দেওয়া হয় (`ReportTemplateService::windowsEnv()`)। প্রিন্টে Word-এর `page:WordSection1` বাদ দেওয়া হয়, যাতে রিপোর্ট আলাদা পাতায় না ভাঙে।
+
+---
+
+### ৫২. রিপোর্ট PDF সংরক্ষণ — পেশেন্ট ও বিলের সঙ্গে (Report PDF storage — 24-Sep-2026)
+* **কী হয়:** রিপোর্ট এডিটরে **Save** করলেই রিপোর্টের একটি **PDF কপি** তৈরি হয়ে সার্ভারে জমা থাকে — ভবিষ্যতে WhatsApp/ইমেল/রিপ্রিন্টের জন্য।
+* **PDF ইঞ্জিন:** `mpdf/mpdf` (**বিশুদ্ধ PHP** — Word বা wkhtmltopdf লাগে না, তাই ক্লাউডেও চলে)। `php.ini`-তে `extension=gd` চালু থাকতে হবে।
+* **ফাইল:** `storage/app/reports/<yyyy-mm>/<booking no>/<test code>_<detail id>.pdf`।
+* **ডাটাবেস:** নতুন টেবিল **`tbl_web_report_files`** (booking id/no, patient code, নাম, মোবাইল, টেস্ট, ফাইল পাথ/সাইজ, কে বানাল) এবং `tbl_web_booking_dtl.report_pdf_path` / `report_pdf_at` — প্রথম সেভেই নিজে থেকে তৈরি হয়।
+* **APIs:** `GET /api/lab/report-pdf/{dtlId}` (না থাকলে তখনই বানায়; `?download=1` ডাউনলোড), `GET /api/lab/report-files?booking_no=&patient_code=&mobile_no=`।
+* **UI:** রিপোর্ট এডিটরে ও Lab Result Entry-তে **PDF** বাটন; সেভের পর অ্যালার্টে PDF সাইজ দেখায়।
+* **Upload Doctor copy (24-Sep-2026):** রিপোর্ট এডিটরের উপরে **Upload Doctor copy** বাটন — ডাক্তারের সই করা কপি আপলোড হয়। **ছবি হলে WebP-তে কনভার্ট হয়ে অন্তত ২৫% ছোট** হয় (কোয়ালিটি ধাপে ধাপে কমে, সর্বোচ্চ সাইড ২২০০px), **PDF হলে সর্বোচ্চ ৩ MB**। ফাইল একই বিলের ফোল্ডারে জমা হয় ও `tbl_web_report_files`-এ `file_type = DOCTOR_COPY` হিসেবে বিল/পেশেন্টের সঙ্গে লিঙ্ক থাকে। API: `POST /api/lab/doctor-copy`, `GET /api/lab/doctor-copy/{dtlId}`।
+* **Doctor copy বাধ্যতামূলক:** ডাক্তারের কপি আপলোড না করলে রিপোর্ট সেভ হয় না — এডিটরে Save/Ctrl+S/Save & Print-এ অ্যালার্ট দেখায় ("Please upload the Doctor copy first") ও আপলোড ডায়ালগ খোলে; ব্যাকএন্ডেও `save-narrative` `422 DOCTOR_COPY_REQUIRED` ফেরত দেয়। টপ বারে "Doctor copy required" ব্যাজ দেখা যায়।
+* **php.ini:** `extension=gd` চালু এবং `upload_max_filesize=16M`, `post_max_size=20M` করা হয়েছে (৩ MB PDF আপলোডের জন্য)।
+* **গুরুত্বপূর্ণ ফিক্স:** PHPWord ও mPDF যোগ হওয়ায় **OPcache-এর ২৫৬ MB মেমরি ভরে গিয়ে Laravel বুট হচ্ছিল না** (`numfmt_get_locale(): Argument #1 must be NumberFormatter` — ভুল ফাংশনে ম্যাপ হচ্ছিল)। `D:\php84\php.ini`-তে `opcache.memory_consumption=512`, `opcache.interned_strings_buffer=64` করা হয়েছে। ব্যাকএন্ড রিস্টার্ট দরকার।
+
+---
+
+### ৫৩. ইউজার অ্যাক্টিভিটি লগ — সব CRUD ইউজার আইডি ও সময়সহ (24-Sep-2026)
+* **সমস্যা:** ৪৪টি data-changing রুটের মধ্যে মাত্র ১৭টিতে অডিট লগ ছিল, আর ফ্রন্টএন্ডের ৩১টি POST/PUT/DELETE কলের মধ্যে মাত্র ৫টি ইউজার হেডার পাঠাত — ফলে `created_by`, `AddUserCode` ইত্যাদিতে সবসময় ডিফল্ট `U0000001` বসত।
+* **ফ্রন্টএন্ড (এক জায়গায় সমাধান):** [lib/apiClient.js](frontend/src/lib/apiClient.js) — `window.fetch` একবার র‍্যাপ করে API-র প্রতিটি কলে **`X-User-Code`** ও **`X-User-Name`** যোগ করে; `AuthContext`-এ ইমপোর্টের সময়ই চালু হয়।
+* **ব্যাকএন্ড:** নতুন [AuditLogMiddleware](backend/app/Http/Middleware/AuditLogMiddleware.php) — `/api/*`-এর প্রতিটি **POST/PUT/PATCH/DELETE** স্বয়ংক্রিয়ভাবে `tbl_web_audit_logs`-এ লেখে (ইউজার কোড, নাম, মডিউল, অ্যাকশন, পেলোড সারাংশ — পাসওয়ার্ড মাস্কড, HTTP স্ট্যাটাস, IP, সময়)। যে রুট নিজে `logAuditLog()` ডাকে সেখানে ডুপ্লিকেট লাইন হয় না।
+* **ঠিক করা হয়েছে:** `logAuditLog('ADMIN','ADMIN',...)` ও `logAuditLog(null,...)` গুলোতে এখন আসল ইউজার কোড যায়; বুকিং রিসিপ্টে `created_by_user` হার্ডকোড `'Admin'`-এর বদলে `tbl_web_users` থেকে আসল নাম।
+* **অডিট ট্রেইল পেজ:** ইউজার / মডিউল / অ্যাকশন ড্রপডাউন + তারিখ রেঞ্জ ফিল্টার, **পেজিনেশন** (Rows 25/50/100/200/500, Prev/Next, "Showing x-y of z") এবং **Export Excel** — ফিল্টার অনুযায়ী CSV (UTF-8 BOM, সরাসরি Excel-এ খোলে, সর্বোচ্চ ২০,০০০ রো)। APIs: `GET /api/setup/audit-logs` (`page`, `per_page`), `GET /api/setup/audit-logs/export`, `GET /api/setup/audit-filters`।
+* **নিয়ম:** [PROJECT_MEMORY.md → 5. User activity logging](PROJECT_MEMORY.md#5-user-activity-logging-who-did-what-when)।
+
+---
+
+### ৫৪. ডিপার্টমেন্ট-ভিত্তিক ল্যাব অ্যাক্সেস সার্ভারেও (24-Sep-2026)
+* **সমস্যা:** ইউজারের ডিপার্টমেন্ট ফিল্টার শুধু ব্রাউজারে ছিল — ব্যাকএন্ড ব্রাউজারের পাঠানো `allowed_depts` প্যারামিটারেই ভরসা করত, তাই API সরাসরি ডাকলে অন্য ডিপার্টমেন্টের রিপোর্টও সেভ করা যেত।
+* **সমাধান:** `userDeptCodes($request)` (হেডারের `X-User-Code` → `tbl_web_user_dept_access`, ADMIN হলে সব; ৬০ সেকেন্ড ক্যাশ, ইউজার সেভ করলে ক্যাশ মুছে যায়) এবং `canWorkOnDtl()` — টেস্টের ডিপার্টমেন্ট (`MTest.DeptCode`) মিলিয়ে দেখে।
+* **যেখানে প্রয়োগ হয়েছে:** `sample-tracking/queue`, `save-result`, `save-parameter-results`, `save-narrative`, `verify`, `lab/doctor-copy`, `lab/approval-queue`, `lab/approve-report`। অন্য ডিপার্টমেন্ট হলে `403 DEPARTMENT_NOT_ALLOWED`; ডিপার্টমেন্ট না দেওয়া থাকলে ওয়ার্কলিস্ট খালি।
+
+---
+
+### ৫৫. নোটিফিকেশন সিস্টেম ও সংশোধিত রিপোর্টের আপডেট (24-Sep-2026)
+* **নতুন টেবিল:** `tbl_web_notifications` — প্রতি রিসিভারের জন্য একটি রো, তাই "পড়া হয়েছে" ইউজার-ভিত্তিক ([NotificationService](backend/app/Services/NotificationService.php))।
+* **কখন যায়:** **রিপোর্ট সেভ হলে** (`REPORT_READY`) → অ্যাডমিন + যাঁদের `report_approval` মডিউল আছে, যাতে তাঁরা চেক করে অ্যাপ্রুভ করতে পারেন; **ফেরত পাঠালে** → যিনি রিপোর্ট লিখেছেন; **সংশোধন করে আবার সেভ করলে** (`REPORT_RESUBMITTED`) → অ্যাপ্রুভাররা; **অ্যাপ্রুভ করলে** → যিনি লিখেছেন। নিজের কাজের নোটিফিকেশন নিজে পান না, এবং একই রিপোর্ট বারবার সেভ করলে না-পড়া নোটিফিকেশন ডুপ্লিকেট হয় না (`dedupe`)।
+* **বেল আইকন (টপ বার):** না-পড়া সংখ্যা দেখায়, প্রতি ৬০ সেকেন্ডে রিফ্রেশ; ক্লিক করলে পড়া হয়ে যায় ও সংশ্লিষ্ট পেজ খোলে, তখন বেল থেকে সরে যায়। "Mark all read"-ও আছে।
+* **নোটিফিকেশন পেজ:** `/notifications` — All / Unread ট্যাব ও পেজিনেশন; পড়া নোটিফিকেশনও এখানে থেকে যায়।
+* **সংশোধনের আপডেট:** ফেরত আসা রিপোর্ট আবার সেভ করলে `report_resubmitted_at/by` বসে; Report Approval তালিকায় **Corrected** ব্যাজ এবং তুলনা ভিউ ও রিভিউ ট্যাবে "Corrected and saved again by X on ..." বার দেখায়।
+* **APIs:** `GET /api/notifications`, `POST /api/notifications/read`।
+
+---
+
+### ৫৬. অ্যাপ্রুভালের আগে PDF ও প্রিন্ট বন্ধ (24-Sep-2026)
+* **নিয়ম:** রিপোর্ট **অ্যাপ্রুভ না হওয়া পর্যন্ত** PDF খোলা বা প্রিন্ট করা যায় না — চেষ্টা করলে "Waiting for approval" অ্যালার্ট।
+* **ব্যাকএন্ড:** `GET /api/lab/report-pdf/{dtlId}` অ্যাপ্রুভ না হলে `403 REPORT_NOT_APPROVED` দেয়; শুধু **অ্যাপ্রুভাররা** (`report_approval` মডিউল বা অ্যাডমিন, `isReportApprover()`) আগে দেখতে পান — কারণ তাঁদের ডাক্তারের কপির সঙ্গে মিলিয়ে দেখতে হয়।
+* **রিপোর্ট এডিটর:** PDF বাটন অ্যালার্ট দেয়; **Save & Print** বাটন অ্যাপ্রুভ না হলে "Save (approval needed to print)" দেখায় — সেভ হয়, প্রিন্ট পেজে যায় না। **নতুন করে সেভ করলে অ্যাপ্রুভাল আবার লাগবে** (`approvedAt` রিসেট)।
+* **Lab Result Entry:** Actions মেনুতে "PDF (after approval)" দেখায়।
+* **Print Report পেজ:** অ্যাপ্রুভ না হওয়া টেস্ট প্রিন্ট থেকে বাদ যায় এবং উপরে ওয়ার্নিং দেখায় (`is_approved` ফিল্ড)।
+
+---
+
+### ৫৭. রিপোর্ট সেভের কনফার্মেশন ও লক (24-Sep-2026)
+* **সেভের আগে কনফার্মেশন:** Save বাটনে ক্লিক করলে প্রথমে জিজ্ঞাসা — "পুরো রিপোর্ট আরেকবার দেখে নিন; সেভ করলে এটি অ্যাপ্রুভালে যাবে এবং অ্যাপ্রুভার ফেরত না পাঠানো পর্যন্ত বদলানো যাবে না"। Ctrl+S-এও একই।
+* **লক:** সেভ হয়ে গেলে **Save বাটন উধাও**, এডিটর রিড-অনলি, উপরে নীল বার ("waiting for approval, read only" / অ্যাপ্রুভড হলে তারিখসহ)।
+* **আবার এডিট কখন:** শুধু অ্যাপ্রুভার কমেন্টসহ **Send back** করলে — তখন `report_sent_back_at` বসে, এডিটর খোলে, একবার সেভ করা যায়; সেভ করলেই send-back মার্ক মুছে গিয়ে আবার লক হয়ে যায় (কমেন্ট ইতিহাসে থাকে)।
+* **ব্যাকএন্ডেও রোধ:** `save-narrative` লক থাকা অবস্থায় `423 REPORT_LOCKED` দেয় (অ্যাপ্রুভড হলে আলাদা বার্তা)। চেকের ক্রম: ডিপার্টমেন্ট → লক → ডাক্তারের কপি।
+
+---
+
+### ৫৮. রিপোর্ট লেটারহেড আপলোড (SetUp → Lab & Report Settings — 25-Sep-2026)
+* **কী:** পুরো A4 লেটারহেড একটি ছবি হিসেবে আপলোড করা যায়; এরপর **সব রিপোর্টের PDF ও প্রিন্ট ওই লেটারহেডের উপরেই** বের হয় এবং অ্যাপের নিজের হেডার বাদ যায়।
+* **কনভার্শন:** যে ফরম্যাটেই দেওয়া হোক (JPG/PNG/WebP/GIF/BMP) — **WebP-তে কনভার্ট** হয়ে `storage/app/settings/letterhead.webp`-এ থাকে; ৩০০dpi A4-র বেশি চওড়া হলে ছোট করা হয় (পরীক্ষায় PNG 44 KB → WebP 10 KB)। ল্যান্ডস্কেপ ছবি গ্রহণ করা হয় না।
+* **মার্জিন:** সেটিংসে **Top space / Bottom space (mm)** — লেটারহেডের ছাপা হেডার-ফুটারের জন্য জায়গা (ডিফল্ট ৪৫ / ২৫ মিমি), `letterhead_top_mm`, `letterhead_bottom_mm`।
+* **APIs:** `GET /api/setup/letterhead` (ছবি), `POST /api/setup/letterhead` (আপলোড), `POST /api/setup/letterhead/remove`; সার্ভিস: [LetterheadService](backend/app/Services/LetterheadService.php)। ডাটাবেস সাময়িক ডাউন থাকলেও ডিস্কের ফাইল থেকেই কাজ চলে।
+* **PDF:** mPDF-এ `SetDefaultBodyCSS('background', ...)` + `background-image-resize: 6`; **প্রিন্ট পেজ:** A4 ব্যাকগ্রাউন্ড + `print-color-adjust: exact`।
+* **সঙ্গে:** `config/database.php`-এ `login_timeout` (ডিফল্ট ৫ সে.) — SQL Server অচল থাকলে প্রতিটি রিকোয়েস্ট ৩০ সেকেন্ড ঝুলে থাকার বদলে দ্রুত জবাব দেয়।
 
 ---
 

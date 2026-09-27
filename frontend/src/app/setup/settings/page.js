@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import styles from './settings.module.css';
-import { Building2, FileText, Save, CheckCircle2, AlertCircle, Plus, Trash2, ShieldCheck } from 'lucide-react';
+import { Building2, FileText, Save, CheckCircle2, AlertCircle, Plus, Trash2, ShieldCheck, Upload, Image as ImageIcon } from 'lucide-react';
 import API_BASE from '@/lib/apiConfig';
 import { DEFAULT_LAB_CONFIG } from '@/lib/labSettings';
 
@@ -11,6 +11,12 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+
+  // Letterhead: one A4 image that every report is printed on
+  const letterheadInputRef = React.useRef(null);
+  const [letterhead, setLetterhead] = useState(null);   // file name once uploaded
+  const [letterheadBusy, setLetterheadBusy] = useState(false);
+  const [letterheadStamp, setLetterheadStamp] = useState(Date.now());
 
   useEffect(() => {
     fetch(`${API_BASE}/api/setup/settings`)
@@ -24,6 +30,7 @@ export default function SettingsPage() {
             }
           });
           setForm(merged);
+          setLetterhead(merged.letterhead_image || null);
         }
         setLoading(false);
       })
@@ -32,6 +39,48 @@ export default function SettingsPage() {
         setLoading(false);
       });
   }, []);
+
+  const uploadLetterhead = async (e) => {
+    const file = e.target.files?.[0];
+    if (letterheadInputRef.current) letterheadInputRef.current.value = '';
+    if (!file) return;
+
+    const body = new FormData();
+    body.append('file', file);
+
+    setLetterheadBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/setup/letterhead`, { method: 'POST', body });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed.');
+
+      setLetterhead(data.file);
+      setLetterheadStamp(Date.now());
+      setForm(prev => ({ ...prev, letterhead_image: data.file }));
+      setMessage({ type: 'success', text: `Letterhead uploaded (${data.width}x${data.height} px, ${data.size_kb} KB). Reports will print on it.` });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setLetterheadBusy(false);
+    }
+  };
+
+  const removeLetterhead = async () => {
+    setLetterheadBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/setup/letterhead/remove`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not remove it.');
+
+      setLetterhead(null);
+      setForm(prev => ({ ...prev, letterhead_image: '' }));
+      setMessage({ type: 'success', text: 'Letterhead removed. Reports print with the plain header again.' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setLetterheadBusy(false);
+    }
+  };
 
   const handleChange = (key, value) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -199,6 +248,68 @@ export default function SettingsPage() {
               value={form.lab_certification || ''}
               onChange={e => handleChange('lab_certification', e.target.value)}
             />
+          </div>
+
+          <div className={styles.formGroupFull}>
+            <label>Report Letterhead (full A4 page image)</label>
+            <div className={styles.letterheadBox}>
+              <div className={styles.letterheadPreview}>
+                {letterhead ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`${API_BASE}/api/setup/letterhead?v=${letterheadStamp}`} alt="Letterhead" />
+                ) : (
+                  <div className={styles.letterheadEmpty}>
+                    <ImageIcon size={26} />
+                    <span>No letterhead</span>
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.letterheadInfo}>
+                <p>
+                  Upload the printed letterhead as one <strong>A4 portrait image</strong> (JPG, PNG or WebP).
+                  Every report PDF and print then comes out on this design, and the plain header is left out.
+                </p>
+
+                <div className={styles.letterheadMargins}>
+                  <div>
+                    <label>Top space (mm)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="120"
+                      value={form.letterhead_top_mm ?? 45}
+                      onChange={e => handleChange('letterhead_top_mm', e.target.value)}
+                    />
+                    <small>Room for the printed header</small>
+                  </div>
+                  <div>
+                    <label>Bottom space (mm)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="120"
+                      value={form.letterhead_bottom_mm ?? 25}
+                      onChange={e => handleChange('letterhead_bottom_mm', e.target.value)}
+                    />
+                    <small>Room for the printed footer</small>
+                  </div>
+                </div>
+
+                <input ref={letterheadInputRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={uploadLetterhead} />
+                <div className={styles.letterheadButtons}>
+                  <button type="button" onClick={() => letterheadInputRef.current?.click()} disabled={letterheadBusy}>
+                    <Upload size={15} /> {letterheadBusy ? 'Working...' : (letterhead ? 'Replace letterhead' : 'Upload letterhead')}
+                  </button>
+                  {letterhead && (
+                    <button type="button" className={styles.letterheadRemove} onClick={removeLetterhead} disabled={letterheadBusy}>
+                      <Trash2 size={15} /> Remove
+                    </button>
+                  )}
+                </div>
+                <small>The top and bottom space is saved with the other settings — press Save Settings after changing it.</small>
+              </div>
+            </div>
           </div>
 
           <div className={styles.formGroup}>

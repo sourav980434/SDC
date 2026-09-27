@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAlert } from '@/components/AlertDialog';
+import { installApiUserHeaders } from '@/lib/apiClient';
 
 const AuthContext = createContext({
   user: null,
@@ -12,6 +13,26 @@ const AuthContext = createContext({
 });
 
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
+const SESSION_KEY = 'sdcp_user_session';
+
+/**
+ * The session lives in sessionStorage, which is per browser tab - a link opened in a NEW tab
+ * (report review, PDF) would land on /login. So the session is mirrored in localStorage and
+ * copied back on the first import in a new tab, i.e. before any page or permission hook reads it.
+ * Signing out clears both, and other tabs follow through the `storage` event.
+ */
+if (typeof window !== 'undefined') {
+  // Every API call carries the signed-in user, so the backend can log who did what
+  installApiUserHeaders();
+  try {
+    if (!sessionStorage.getItem(SESSION_KEY)) {
+      const shared = localStorage.getItem(SESSION_KEY);
+      if (shared) sessionStorage.setItem(SESSION_KEY, shared);
+    }
+  } catch (e) {
+    // private mode / storage blocked - the user simply logs in again
+  }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -21,12 +42,14 @@ export function AuthProvider({ children }) {
   const inactivityTimerRef = useRef(null);
   const { showAlert } = useAlert();
 
-  // Initialize session from sessionStorage
+  // Initialize session from sessionStorage (already filled from localStorage above in a new tab)
   useEffect(() => {
     try {
-      const stored = sessionStorage.getItem('sdcp_user_session');
+      const stored = sessionStorage.getItem(SESSION_KEY);
       if (stored) {
         setUser(JSON.parse(stored));
+        // Sessions started before this tab-sharing existed are mirrored now
+        if (!localStorage.getItem(SESSION_KEY)) localStorage.setItem(SESSION_KEY, stored);
       }
     } catch (e) {
       console.error('Failed to parse user session:', e);
@@ -35,10 +58,25 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Sign out everywhere when another tab signs out
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== SESSION_KEY) return;
+      if (!e.newValue) {
+        try { sessionStorage.removeItem(SESSION_KEY); } catch (err) {}
+        setUser(null);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   // Login handler
   const login = (userData) => {
     try {
-      sessionStorage.setItem('sdcp_user_session', JSON.stringify(userData));
+      const payload = JSON.stringify(userData);
+      sessionStorage.setItem(SESSION_KEY, payload);
+      localStorage.setItem(SESSION_KEY, payload);   // so a link opened in a new tab stays signed in
       setUser(userData);
       router.push('/dashboard');
     } catch (e) {
@@ -49,7 +87,8 @@ export function AuthProvider({ children }) {
   // Logout handler
   const logout = (reason = '') => {
     try {
-      sessionStorage.removeItem('sdcp_user_session');
+      sessionStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SESSION_KEY);
       setUser(null);
       if (reason) {
         showAlert({ type: 'warning', title: 'Signed out', message: reason });

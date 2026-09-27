@@ -186,3 +186,126 @@
 .removeBtn:hover {
   background: #fca5a5;
 }
+
+/* Report letterhead upload */
+.letterheadBox {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.letterheadPreview {
+  width: 150px;
+  height: 212px;           /* A4 ratio */
+  flex-shrink: 0;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.letterheadPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.letterheadEmpty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--outline);
+  font-size: 12px;
+  background: var(--surface-container-high);
+}
+
+.letterheadInfo {
+  flex: 1;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.letterheadInfo p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--outline);
+  line-height: 1.6;
+}
+
+.letterheadInfo small {
+  font-size: 11.5px;
+  color: var(--outline);
+}
+
+.letterheadMargins {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.letterheadMargins label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-surface-variant);
+  margin-bottom: 4px;
+}
+
+.letterheadMargins input {
+  width: 110px;
+  padding: 8px 10px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+}
+
+.letterheadButtons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.letterheadButtons button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  background: var(--surface-container-low);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.letterheadButtons button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.letterheadRemove {
+  color: #b91c1c !important;
+  border-color: #fecaca !important;
+  background: #fef2f2 !important;
+}
+
+.formGroupFull {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formGroupFull > label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--on-surface-variant);
+}

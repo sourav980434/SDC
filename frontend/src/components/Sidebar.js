@@ -14,12 +14,7 @@ import {
   Printer,
   BarChart3,
   ChevronDown,
-  Headphones,
-  HelpCircle,
-  ChevronLeft,
-  ChevronRight,
-  ShieldCheck,
-  LogOut
+  ShieldCheck
 } from 'lucide-react';
 import styles from '../app/layout.module.css';
 
@@ -43,15 +38,15 @@ const MENU_GROUPS = [
     shortcutId: 'MENU_MASTER',
     isActivePath: (p) => p.startsWith('/master/'),
     items: [
-      { href: '/master/doctors', label: 'Doctor List', letter: 'd' },
-      { href: '/master/tests', label: 'Test Rate List', letter: 't' },
-      { href: '/master/categories', label: 'Category List', letter: 'c' },
-      { href: '/master/patients', label: 'Patient List', letter: 'p' },
-      { href: '/master/departments', label: 'Department Details', letter: 'e' },
-      { href: '/master/subdepartments', label: 'Sub Department', letter: 's' },
-      { href: '/master/marketing-executives', label: 'Marketing Executive', letter: 'm' },
-      { href: '/master/collectors', label: 'Collector Details', letter: 'l' },
-      { href: '/master/report-templates', label: 'Report Template', letter: 'r' },
+      { href: '/master/doctors', label: 'Doctor List', letter: 'd' , module: 'masters' },
+      { href: '/master/tests', label: 'Test Rate List', letter: 't' , module: 'masters' },
+      { href: '/master/categories', label: 'Category List', letter: 'c' , module: 'masters' },
+      { href: '/master/patients', label: 'Patient List', letter: 'p' , module: 'masters' },
+      { href: '/master/departments', label: 'Department Details', letter: 'e' , module: 'masters' },
+      { href: '/master/subdepartments', label: 'Sub Department', letter: 's' , module: 'masters' },
+      { href: '/master/marketing-executives', label: 'Marketing Executive', letter: 'm' , module: 'masters' },
+      { href: '/master/collectors', label: 'Collector Details', letter: 'l' , module: 'masters' },
+      { href: '/master/report-templates', label: 'Report Template', letter: 'r', module: 'report_templates' },
     ],
   },
   {
@@ -102,6 +97,7 @@ const MENU_GROUPS = [
     items: [
       { href: '/lab/sample-tracking', label: 'Sample Tracking', letter: 's', module: 'sample_tracking' },
       { href: '/lab/result-entry', label: 'Lab Result Entry', letter: 'r', module: 'result_entry' },
+      { href: '/lab/report-approval', label: 'Report Approval', letter: 'a', module: 'report_approval' },
       { href: '/lab/verification', label: 'Pathology Verification', letter: 'v', module: 'verification' },
       { href: '/pending-tests', label: 'Pending Test Register', letter: 't', module: 'pending_tests', globalShortcut: 'GOTO_PENDING' },
     ],
@@ -113,35 +109,14 @@ const CLOSED_MENUS = { master: false, transaction: false, setup: false, print: f
 // Flash target id for a menu item (reuses the global shortcut id when the page has one)
 const itemShortcutId = (item) => item.globalShortcut || `MENU_ITEM:${item.href}`;
 
-export default function Sidebar({ isOpen }) {
+export default function Sidebar({ isOpen, isCollapsed = false, setIsCollapsed = () => {} }) {
   const pathname = usePathname();
   const router = useRouter();
   const { shortcuts, parseKeyEvent } = useHotkeys();
-  const { user: activeUser, logout, isLoaded } = useAuth();
+  const { user: activeUser, isLoaded } = useAuth();
 
-  const [isCollapsed, setIsCollapsed] = useState(false);
   // Group waiting for an item letter after its menu shortcut was pressed (null = not in letter mode)
   const [keyMenu, setKeyMenu] = useState(null);
-
-  useEffect(() => {
-    try {
-      const storedCollapsed = localStorage.getItem('sdcp_sidebar_collapsed');
-      if (storedCollapsed !== null) {
-        setIsCollapsed(storedCollapsed === 'true');
-      }
-    } catch (e) {
-      console.error("Error reading sidebar state:", e);
-    }
-  }, []);
-
-
-  const toggleCollapse = () => {
-    setIsCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('sdcp_sidebar_collapsed', String(next));
-      return next;
-    });
-  };
 
   const [openMenus, setOpenMenus] = useState({
     master: pathname.startsWith('/master/'),
@@ -152,10 +127,7 @@ export default function Sidebar({ isOpen }) {
   });
 
   const expandSidebar = () => {
-    if (isCollapsed) {
-      setIsCollapsed(false);
-      localStorage.setItem('sdcp_sidebar_collapsed', 'false');
-    }
+    if (isCollapsed) setIsCollapsed(false);
   };
 
   const toggleMenu = (menu) => {
@@ -196,11 +168,11 @@ export default function Sidebar({ isOpen }) {
   };
 
   const groupVisible = {
-    master: isLoaded && (isAdmin || hasModule('masters')),
+    master: isLoaded && (isAdmin || hasModule('masters') || hasModule('report_templates')),
     transaction: isLoaded && (isAdmin || hasModule('booking') || hasModule('invoice') || hasModule('archive_bills')),
     setup: isLoaded && (isAdmin || hasModule('setup')),
     print: isLoaded && (isAdmin || hasModule('reports')),
-    query: isLoaded && (isAdmin || hasModule('reports') || hasModule('pending_tests') || hasModule('verification') || hasModule('sample_tracking') || hasModule('result_entry')),
+    query: isLoaded && (isAdmin || hasModule('reports') || hasModule('pending_tests') || hasModule('verification') || hasModule('sample_tracking') || hasModule('result_entry') || hasModule('report_approval')),
   };
 
   const visibleItems = (group) => group.items.filter(item => !item.module || isAdmin || hasModule(item.module));
@@ -387,54 +359,7 @@ export default function Sidebar({ isOpen }) {
         })}
       </nav>
 
-      {/* Sidebar Footer with Collapse Toggle */}
-      <div className={styles.sidebarFooter}>
-        <button
-          onClick={toggleCollapse}
-          className={styles.collapseToggleBtn}
-          title={isCollapsed ? "Expand Sidebar Menu" : "Collapse Sidebar Menu"}
-        >
-          {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          {!isCollapsed && <span>Hide Menu</span>}
-        </button>
-
-        {!isCollapsed && (
-          <>
-            <a className={styles.footerLink} href="#">
-              <Headphones size={15} />
-              <span>Support</span>
-            </a>
-            <a className={styles.footerLink} href="#">
-              <HelpCircle size={15} />
-              <span>Help</span>
-            </a>
-          </>
-        )}
-
-        {isLoaded && activeUser && (
-          <div className={styles.userCard} title={isCollapsed ? `${activeUser.full_name || activeUser.username} (${activeUser.role_code})` : ""}>
-            <div className={styles.userAvatar}>
-              {(activeUser.username || 'U')[0].toUpperCase()}
-            </div>
-            {!isCollapsed && (
-              <div className={styles.userInfo}>
-                <span className={styles.userName}>{activeUser.full_name || activeUser.username}</span>
-                <span className={styles.userRole}>{activeUser.role_name || activeUser.role_code}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={() => logout()}
-          className={styles.sidebarLogoffBtn}
-          title="Log Off Session"
-        >
-          <LogOut size={16} />
-          {!isCollapsed && <span>Log Off</span>}
-        </button>
-      </div>
+      {/* The collapse toggle, Support, Help, the user card and Log Off all live in the top bar now */}
     </aside>
   );
 }
