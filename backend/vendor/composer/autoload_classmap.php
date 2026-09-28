@@ -16,6 +16,7 @@ return array(
     'App\\Services\\ReportEntryService' => $baseDir . '/app/Services/ReportEntryService.php',
     'App\\Services\\ReportPdfService' => $baseDir . '/app/Services/ReportPdfService.php',
     'App\\Services\\ReportTemplateService' => $baseDir . '/app/Services/ReportTemplateService.php',
+    'App\\Services\\SampleFormatService' => $baseDir . '/app/Services/SampleFormatService.php',
     'App\\Services\\TemplateImportService' => $baseDir . '/app/Services/TemplateImportService.php',
     'App\\Services\\TestFormatService' => $baseDir . '/app/Services/TestFormatService.php',
     'Attribute' => $vendorDir . '/symfony/polyfill-php80/Resources/stubs/Attribute.php',
